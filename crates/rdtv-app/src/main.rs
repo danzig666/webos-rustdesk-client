@@ -3,6 +3,7 @@
 mod app;
 mod audio_out;
 mod gfx;
+mod hwplane;
 mod keys;
 mod osk;
 mod platform;
@@ -54,6 +55,11 @@ fn run() -> anyhow::Result<()> {
     let mut wb = video.window("RemoteDesk TV", w, h);
     if keys::is_webos() || std::env::var("RDTV_FULLSCREEN").is_ok() {
         wb.fullscreen();
+    }
+    if keys::is_webos() {
+        // Exported video windows need an OpenGL window; creating it so up front avoids
+        // SDL-webOS recreating the window (and invalidating the renderer) later.
+        wb.opengl();
     } else {
         wb.resizable();
     }

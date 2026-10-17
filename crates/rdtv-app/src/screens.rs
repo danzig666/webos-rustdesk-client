@@ -411,6 +411,11 @@ fn settings(app: &mut App, f: &mut Frame) {
             if s.prefer_hardware_decoding { 2 } else { 1 },
         ),
         (
+            "set-place",
+            "Hardware picture placement: shrink/zoom with hardware decoding (experimental)".into(),
+            if s.hw_picture_placement { 2 } else { 1 },
+        ),
+        (
             "set-chord",
             "Keyboard shortcut Ctrl+Alt+Shift+Space opens session menu".into(),
             if s.escape_chord_enabled { 2 } else { 1 },
@@ -456,6 +461,10 @@ fn settings(app: &mut App, f: &mut Frame) {
         "set-hw" => {
             st.prefer_hardware_decoding = !st.prefer_hardware_decoding;
             app.failed_codecs.clear();
+        }
+        "set-place" => {
+            st.hw_picture_placement = !st.hw_picture_placement;
+            app.hwplane_error = None;
         }
         "set-chord" => st.escape_chord_enabled = !st.escape_chord_enabled,
         "set-motion" => st.reduced_motion = !st.reduced_motion,
@@ -971,6 +980,22 @@ pub fn diagnostics_text(app: &App) -> String {
             "on"
         } else {
             "off"
+        }
+    ));
+    s.push_str(&format!(
+        "Hardware picture placement: {}\n",
+        if !app.store.state.settings.hw_picture_placement {
+            "off".to_owned()
+        } else if let Some(e) = &app.hwplane_error {
+            format!("unavailable ({e})")
+        } else if let Some(p) = &app.hwplane {
+            format!(
+                "exported window {} · {}",
+                p.id(),
+                rdtv_media::ndl::window_status()
+            )
+        } else {
+            "not started yet".to_owned()
         }
     ));
     s.push_str(&format!(

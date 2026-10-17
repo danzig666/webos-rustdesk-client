@@ -144,6 +144,9 @@ pub struct App {
     /// In-memory salted hash of the last successful login (for automatic reconnect).
     pub last_session_hash: Option<Vec<u8>>,
     pub toast: Option<(String, Instant)>,
+    /// Experimental hardware picture placement (exported video window).
+    pub hwplane: Option<crate::hwplane::HwPlane>,
+    pub hwplane_error: Option<String>,
 }
 
 /// Leaving the app: stop input at once; disconnect when focus has not come back after this
@@ -201,6 +204,8 @@ impl App {
             last_session: None,
             last_session_hash: None,
             toast: None,
+            hwplane: None,
+            hwplane_error: None,
         }
     }
 
@@ -339,6 +344,7 @@ impl App {
             // Re-open so the callback reads the new ring.
             self.audio_out = AudioOut::open(&self.sdl, ring.clone()).ok();
         }
+        self.prepare_hwplane();
         let a = ActiveSession::start(self, req, ring, rec.settings);
         self.active = Some(a);
         self.last_session = Some((profile.id.clone(), target));
@@ -346,6 +352,36 @@ impl App {
             phase: session::Phase::Connecting,
             since: Instant::now(),
         });
+    }
+
+    /// Create (once) or drop the exported video window, and tell NDL to bind to it.
+    fn prepare_hwplane(&mut self) {
+        let s = &self.store.state.settings;
+        let wanted = crate::keys::is_webos()
+            && s.hw_picture_placement
+            && s.prefer_hardware_decoding
+            && self.platform.ndl_available;
+        if !wanted {
+            self.hwplane = None;
+            rdtv_media::ndl::set_target_window(None);
+            return;
+        }
+        if self.hwplane.is_none() && self.hwplane_error.is_none() {
+            match crate::hwplane::HwPlane::create() {
+                Ok(p) => self.hwplane = Some(p),
+                Err(e) => {
+                    log::warn!("hardware picture placement unavailable: {e}");
+                    self.hwplane_error = Some(e);
+                }
+            }
+        }
+        match self.hwplane.as_mut() {
+            Some(p) => {
+                p.invalidate();
+                rdtv_media::ndl::set_target_window(Some(p.id()));
+            }
+            None => rdtv_media::ndl::set_target_window(None),
+        }
     }
 
     /// End the active session. `intentional` sessions are never retried.

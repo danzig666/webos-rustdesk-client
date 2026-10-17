@@ -147,6 +147,8 @@ pub struct ActiveSession {
     pub notice: Option<(String, Instant)>,
     pub uac: bool,
     px_per_logical: f32,
+    /// Hardware picture placement active (exported window bound to the decoder).
+    pub placement: bool,
 }
 
 pub fn keycode_char(key: Keycode, mods: &KeyMods) -> Option<char> {
@@ -313,6 +315,7 @@ impl ActiveSession {
             notice: None,
             uac: false,
             px_per_logical: 1.0,
+            placement: false,
         }
     }
 
@@ -594,6 +597,11 @@ impl ActiveSession {
         self.presenting.is_some_and(|p| p.1)
     }
 
+    /// Hardware picture that the TV can only show full-screen (no exported-window placement).
+    fn hw_fullscreen(&self) -> bool {
+        self.hardware() && !self.placement
+    }
+
     fn stream_size(&self) -> (f32, f32) {
         if let Some((_, w, h)) = &self.video_tex {
             return (*w as f32, *h as f32);
@@ -612,14 +620,14 @@ impl ActiveSession {
         let osk_h = self.osk.as_ref().map(|o| o.height()).unwrap_or(0);
         let shrink = self.osk.is_some()
             && self.settings.osk_presentation == OskPresentation::Shrink
-            && !self.hardware();
+            && !self.hw_fullscreen();
         let area = if shrink {
             RectF::new(0.0, 0.0, W as f32, (H - osk_h) as f32)
         } else {
             RectF::new(0.0, 0.0, W as f32, H as f32)
         };
         let (sw, sh) = self.stream_size();
-        let st = if self.hardware() {
+        let st = if self.hw_fullscreen() {
             ViewState::default()
         } else {
             self.view
@@ -679,7 +687,7 @@ impl ActiveSession {
         self.menu = Menu::None;
         // Keyboard owns the D-pad while open; release anything the D-pad was holding.
         self.dpad = [false; 4];
-        if self.hardware() && self.settings.osk_presentation == OskPresentation::Shrink {
+        if self.hw_fullscreen() && self.settings.osk_presentation == OskPresentation::Shrink {
             self.notice = Some(("With hardware decoding the TV shows the picture full-screen, so the keyboard overlays it (shrink needs software decoding).".into(), Instant::now()));
         }
     }
@@ -730,7 +738,7 @@ impl ActiveSession {
                     self.vmouse.1 + dy.round() as i32,
                 );
                 self.move_to(nx, ny);
-                if self.view.mode != ViewMode::Fit && !self.hardware() {
+                if self.view.mode != ViewMode::Fit && !self.hw_fullscreen() {
                     let area = RectF::new(0.0, 0.0, W as f32, H as f32);
                     let (px, py) = view::pan_to_include(&self.view, v, area, m, nx, ny);
                     self.view.pan_x = px;
@@ -1173,6 +1181,20 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
         return;
     };
     a.px_per_logical = f.g.raster_scale;
+    a.placement = app.hwplane.is_some() && rdtv_media::ndl::window_bound();
+    if a.placement && a.hardware() {
+        let v = a.view_rect();
+        let stream = a.stream_size();
+        let ok = match crate::hwplane::crop_for(v, stream, (W as f32, H as f32), f.g.raster_scale) {
+            Some((src, dst)) => app.hwplane.as_mut().is_some_and(|p| p.place(src, dst)),
+            None => true,
+        };
+        if !ok && app.hwplane.as_ref().is_some_and(|p| p.failures >= 3) {
+            // The compositor keeps refusing: stop pretending placement works.
+            a.placement = false;
+            app.hwplane_error = Some("SDL_webOSSetExportedWindow keeps failing".into());
+        }
+    }
     a.upload_video(f.g);
     a.upload_cursor(f.g);
     let hw = a.hardware();
@@ -1432,7 +1454,7 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
         }
         Menu::View => {
             title = "View (local only; the remote resolution never changes)".to_owned();
-            let hw = a.hardware();
+            let hw = a.hw_fullscreen();
             rows.push(("Fit to screen".into(), Act::View(ViewMode::Fit)));
             if hw {
                 rows.push((

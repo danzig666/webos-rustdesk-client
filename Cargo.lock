@@ -2503,6 +2503,7 @@ dependencies = [
  "anyhow",
  "cc",
  "fontdue",
+ "libc",
  "log",
  "rdtv-core",
  "rdtv-media",

@@ -188,9 +188,9 @@ pub struct AppSettings {
     pub reduced_motion: bool,
     pub escape_chord_enabled: bool,
     pub prefer_hardware_decoding: bool,
-    /// Experimental: drive the hardware video plane through an exported window so zoom,
-    /// pan and keyboard-shrink also work with hardware decoding.
-    pub hw_viewport_experimental: bool,
+    /// Experimental: bind the hardware video to an exported window so keyboard-shrink, 1:1
+    /// and zoom also work with hardware decoding (falls back to full-screen on failure).
+    pub hw_picture_placement: bool,
     pub audio_enabled_default: bool,
 }
 
@@ -203,7 +203,7 @@ impl Default for AppSettings {
             reduced_motion: false,
             escape_chord_enabled: true,
             prefer_hardware_decoding: true,
-            hw_viewport_experimental: false,
+            hw_picture_placement: true,
             audio_enabled_default: true,
         }
     }
