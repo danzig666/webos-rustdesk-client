@@ -161,8 +161,12 @@ pub struct CursorImage {
 pub enum SessionEvent {
     Phase(Phase),
     /// The host wants a password. `wrong` = previous one was rejected.
-    PasswordRequired { wrong: bool },
-    TwoFactorRequired { wrong: bool },
+    PasswordRequired {
+        wrong: bool,
+    },
+    TwoFactorRequired {
+        wrong: bool,
+    },
     Connected {
         peer: PeerSummary,
         route: Route,
@@ -179,10 +183,19 @@ pub enum SessionEvent {
     SwitchDisplay(DisplayDesc),
     Cursor(CursorImage),
     CursorId(u64),
-    CursorPosition { x: i32, y: i32 },
-    Permission { name: String, enabled: bool },
+    CursorPosition {
+        x: i32,
+        y: i32,
+    },
+    Permission {
+        name: String,
+        enabled: bool,
+    },
     /// Informational host message (msgbox), already sanitized.
-    Notice { title: String, text: String },
+    Notice {
+        title: String,
+        text: String,
+    },
     /// Host reported the remote side is in a UAC/elevated state.
     Uac(bool),
     Ended(EndReason),
@@ -199,22 +212,34 @@ pub struct EndReason {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum SessionCommand {
     Send(Message),
     SendMany(Vec<Message>),
-    Password { password: String, remember: bool },
-    TwoFactor { code: String },
+    Password {
+        password: String,
+        remember: bool,
+    },
+    TwoFactor {
+        code: String,
+    },
     SwitchDisplay(i32),
     RefreshVideo(i32),
     SetQuality(Quality),
     SetFps(u32),
     SetAudio(bool),
-    ChangeResolution { display: i32, width: i32, height: i32 },
+    ChangeResolution {
+        display: i32,
+        width: i32,
+        height: i32,
+    },
     /// Re-advertise decodable codecs (e.g. after a hardware decoder failed); upstream
     /// `update_supported_decodings`.
     UpdateDecoding(DecodeCaps),
     /// End the session. `lock` sends upstream's LockScreen first when the transport is up.
-    Disconnect { lock: bool },
+    Disconnect {
+        lock: bool,
+    },
 }
 
 #[derive(Clone)]
@@ -438,7 +463,10 @@ async fn run(
     let secured = est.secured;
     let mut peer: Stream = est.stream;
     emit(SessionEvent::Phase(Phase::LoggingIn));
-    log::info!("session {generation}: transport up ({}), secured={secured}", route.label());
+    log::info!(
+        "session {generation}: transport up ({}), secured={secured}",
+        route.label()
+    );
 
     let session_id = hbb_common::rand::random::<u64>();
     let mut login = LoginState {
@@ -752,7 +780,12 @@ mod tests {
             remembered_hash: None,
             remember: false,
             settings: PeerSettings::default(),
-            caps: DecodeCaps { vp9: true, h264: true, h265: true, ..Default::default() },
+            caps: DecodeCaps {
+                vp9: true,
+                h264: true,
+                h265: true,
+                ..Default::default()
+            },
             audio_enabled: true,
             client_id: "111222333".into(),
             client_name: "LG TV".into(),
@@ -765,10 +798,19 @@ mod tests {
         let m = login_msg(&req(), vec![], 1);
         let lr = m.login_request();
         let o = lr.option.as_ref().unwrap();
-        assert_eq!(o.disable_clipboard.enum_value_or_default(), option_message::BoolOption::Yes);
-        assert_eq!(o.enable_file_transfer.enum_value_or_default(), option_message::BoolOption::No);
+        assert_eq!(
+            o.disable_clipboard.enum_value_or_default(),
+            option_message::BoolOption::Yes
+        );
+        assert_eq!(
+            o.enable_file_transfer.enum_value_or_default(),
+            option_message::BoolOption::No
+        );
         let d = o.supported_decoding.as_ref().unwrap();
-        assert_eq!((d.ability_vp9, d.ability_h264, d.ability_h265, d.ability_av1), (1, 1, 1, 0));
+        assert_eq!(
+            (d.ability_vp9, d.ability_h264, d.ability_h265, d.ability_av1),
+            (1, 1, 1, 0)
+        );
         assert_eq!(lr.username, "123456789");
         assert!(lr.file_transfer().dir.is_empty());
     }
@@ -788,9 +830,15 @@ mod tests {
 
     #[test]
     fn codec_preference_falls_back_when_unsupported() {
-        let caps = DecodeCaps { vp9: true, ..Default::default() };
+        let caps = DecodeCaps {
+            vp9: true,
+            ..Default::default()
+        };
         let d = caps.to_supported_decoding(CodecPreference::H265);
-        assert_eq!(d.prefer.enum_value_or_default(), supported_decoding::PreferCodec::Auto);
+        assert_eq!(
+            d.prefer.enum_value_or_default(),
+            supported_decoding::PreferCodec::Auto
+        );
     }
 
     #[test]

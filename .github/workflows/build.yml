@@ -1,0 +1,169 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      prerelease_tag:
+        description: "Optional: publish a test pre-release with this tag (e.g. v0.1.0-test.2)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # openlgtv/buildroot-nc4 webOS SDK (x86_64 host): gcc 14.2, glibc 2.12 sysroot, softfp.
+  WEBOS_SDK_URL: https://github.com/openlgtv/buildroot-nc4/releases/download/webos-a38c582/arm-webos-linux-gnueabi_sdk-buildroot-x86_64.tar.gz
+  WEBOS_SDK_SHA256: 04ad3311b48b4557a7002aef56ae2e167478e8e129f37daac04649bddf813616
+  APP_ID: io.github.danzig666.remotedesktv
+
+jobs:
+  host:
+    name: format, lint, tests (desktop)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+      - name: System packages
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev nasm pkg-config
+      - name: Toolchain (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            build/deps-src
+            deps-out/host
+          key: host-${{ hashFiles('Cargo.lock', 'scripts/build-deps.sh', 'rust-toolchain.toml') }}
+      - name: Build C media libraries (host)
+        run: scripts/build-deps.sh host
+      - name: rustfmt
+        run: cargo fmt -p rdtv-core -p rdtv-media -p rdtv-app -- --check
+      - name: clippy (project crates; the pinned upstream libraries are not linted)
+        run: |
+          cargo clippy --locked -p rdtv-core -p rdtv-media -p rdtv-app --all-targets --message-format=short 2>&1 | tee clippy.txt
+          if grep -E '^crates/.*(warning|error)' clippy.txt; then echo "clippy findings in project crates"; exit 1; fi
+      - name: tests
+        run: cargo test --locked -p rdtv-core -p rdtv-media -p rdtv-app
+
+  webos:
+    name: webOS IPK
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+      - name: System packages
+        run: sudo apt-get update && sudo apt-get install -y qemu-user binutils
+      - name: Toolchain (rust-toolchain.toml, armv7-unknown-linux-gnueabi)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            build/deps-src
+            deps-out/webos
+            build/sdk.tar.gz
+          key: webos-${{ hashFiles('Cargo.lock', 'scripts/build-deps.sh', 'rust-toolchain.toml') }}-${{ env.WEBOS_SDK_SHA256 }}
+      - name: webOS SDK
+        run: |
+          mkdir -p build
+          [ -f build/sdk.tar.gz ] || curl -fsSL -o build/sdk.tar.gz "$WEBOS_SDK_URL"
+          echo "$WEBOS_SDK_SHA256  build/sdk.tar.gz" | sha256sum -c -
+          tar xzf build/sdk.tar.gz -C build
+          build/arm-webos-linux-gnueabi_sdk-buildroot/relocate-sdk.sh
+          echo "WEBOS_SDK=$PWD/build/arm-webos-linux-gnueabi_sdk-buildroot" >> "$GITHUB_ENV"
+      - name: Version
+        id: ver
+        run: |
+          base=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+          ref="${GITHUB_REF_NAME}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${ref#v}"; v="${v%%-*}"; else v="$base"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "IPK version: $v"
+      - name: Build C media libraries + SDL2 webOS backport
+        run: scripts/build-deps.sh webos
+      - name: Cross-compile
+        run: cargo build --locked --release --target armv7-unknown-linux-gnueabi -p rdtv-app
+      - name: ELF / ABI audit
+        run: scripts/elf-audit.sh target/armv7-unknown-linux-gnueabi/release/remotedesk-tv deps-out/webos/lib/libSDL2-2.0.so.0 | tee elf-audit.txt
+      - name: Smoke test under qemu-arm (Debian armel userland)
+        run: scripts/smoke-armel.sh target/armv7-unknown-linux-gnueabi/release/remotedesk-tv deps-out/webos/lib/libSDL2-2.0.so.0 | tee smoke-test.txt
+      - name: Notices, licenses, SBOM
+        run: |
+          python3 scripts/gen-notices.py --licenses-dir build/licenses
+          cp -r deps-out/webos/licenses/* build/licenses/
+      - name: Package IPK
+        run: |
+          python3 scripts/package-ipk.py \
+            --binary target/armv7-unknown-linux-gnueabi/release/remotedesk-tv \
+            --sdl-lib deps-out/webos/lib/libSDL2-2.0.so.0 \
+            --version "${{ steps.ver.outputs.version }}" \
+            --strip "$WEBOS_SDK/bin/arm-webos-linux-gnueabi-strip" \
+            --licenses build/licenses \
+            --out dist
+          cp THIRD-PARTY-NOTICES.txt sbom.cdx.json elf-audit.txt smoke-test.txt dist/
+          (cd dist && sha256sum *.ipk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - name: Verify IPK with webosbrew tooling
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v20260818-ea38b20 --repo webosbrew/dev-toolbox-cli --pattern '*_amd64.deb' --dir build/toolbox
+          sudo apt-get install -y ./build/toolbox/*.deb
+          webosbrew-ipk-verify dist/*.ipk --fw-releases '>=5' --details --format markdown | tee dist/ipk-verify.md || {
+            echo "::warning::webosbrew-ipk-verify reported problems (see dist/ipk-verify.md)"; }
+          cat dist/ipk-verify.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Homebrew manifest
+        run: |
+          python3 scripts/homebrew-manifest.py --ipk dist/*.ipk --version "${{ steps.ver.outputs.version }}" \
+            --tag "${GITHUB_REF_NAME}" --out "dist/${APP_ID}.manifest.json"
+      - name: Source archive (AGPL corresponding source, with submodules)
+        run: |
+          git ls-files --recurse-submodules -z | tar --null -czf "dist/remotedesk-tv-${{ steps.ver.outputs.version }}-source.tar.gz" --transform 's,^,remotedesk-tv/,' -T -
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: remotedesk-tv-ipk
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    needs: [host, webos]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease_tag != '')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: remotedesk-tv-ipk
+          path: dist
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then tag="${{ github.event.inputs.prerelease_tag }}"; fi
+          flags="--prerelease"
+          # Stable releases need real release-gate evidence (docs/COMPATIBILITY.md); until then
+          # every published build is a pre-release / test build.
+          notes=docs/RELEASE_NOTES.md
+          gh release view "$tag" >/dev/null 2>&1 && gh release delete "$tag" --yes --cleanup-tag=false
+          gh release create "$tag" dist/* $flags --target "$GITHUB_SHA" --title "RemoteDesk TV ${tag} (test build)" --notes-file "$notes"

@@ -27,7 +27,12 @@ impl AudioOut {
             samples: Some(1024),
         };
         let dev = audio.open_playback(None, &spec, |got| {
-            log::info!("audio device: {} Hz x{} ({} samples)", got.freq, got.channels, got.samples);
+            log::info!(
+                "audio device: {} Hz x{} ({} samples)",
+                got.freq,
+                got.channels,
+                got.samples
+            );
             Feed(ring)
         })?;
         dev.resume();

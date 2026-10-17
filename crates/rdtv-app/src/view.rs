@@ -73,13 +73,7 @@ pub const MAX_ZOOM: f32 = 6.0;
 ///
 /// `px_per_logical` is drawable pixels per logical unit (1.0 on a 1920x1080 UI plane): it
 /// makes "1:1" mean one stream pixel per drawable pixel.
-pub fn view_rect(
-    area: RectF,
-    stream_w: f32,
-    stream_h: f32,
-    st: &ViewState,
-    px_per_logical: f32,
-) -> RectF {
+pub fn view_rect(area: RectF, stream_w: f32, stream_h: f32, st: &ViewState, px_per_logical: f32) -> RectF {
     if stream_w <= 0.0 || stream_h <= 0.0 || area.w <= 0.0 || area.h <= 0.0 {
         return area;
     }
@@ -115,10 +109,7 @@ pub fn to_host(v: RectF, mon: Monitor, px: f32, py: f32) -> Option<(i32, i32)> {
     }
     let lx = ((px - v.x) / v.w * mon.w as f32).floor() as i32;
     let ly = ((py - v.y) / v.h * mon.h as f32).floor() as i32;
-    Some((
-        mon.x + lx.clamp(0, mon.w - 1),
-        mon.y + ly.clamp(0, mon.h - 1),
-    ))
+    Some((mon.x + lx.clamp(0, mon.w - 1), mon.y + ly.clamp(0, mon.h - 1)))
 }
 
 /// Global host coordinates -> UI logical point (for drawing the remote cursor).
@@ -159,7 +150,12 @@ pub fn pan_to_include(st: &ViewState, v: RectF, area: RectF, mon: Monitor, hx: i
 mod tests {
     use super::*;
 
-    const FULL: RectF = RectF { x: 0.0, y: 0.0, w: 1920.0, h: 1080.0 };
+    const FULL: RectF = RectF {
+        x: 0.0,
+        y: 0.0,
+        w: 1920.0,
+        h: 1080.0,
+    };
 
     #[test]
     fn fit_letterboxes_and_maps_corners() {
@@ -169,7 +165,12 @@ mod tests {
         assert_eq!(v.h, 1080.0);
         assert!((v.w - 1440.0).abs() < 0.01);
         assert!((v.x - 240.0).abs() < 0.01);
-        let mon = Monitor { x: 0, y: 0, w: 1600, h: 1200 };
+        let mon = Monitor {
+            x: 0,
+            y: 0,
+            w: 1600,
+            h: 1200,
+        };
         assert_eq!(to_host(v, mon, 240.0, 0.0), Some((0, 0)));
         assert_eq!(to_host(v, mon, 240.0 + 1439.99, 1079.99), Some((1599, 1199)));
         // Letterbox bar: no click.
@@ -180,7 +181,12 @@ mod tests {
     fn monitor_origin_applied_once_including_negative() {
         let st = ViewState::default();
         let v = view_rect(FULL, 1920.0, 1080.0, &st, 1.0);
-        let mon = Monitor { x: -1920, y: -200, w: 1920, h: 1080 };
+        let mon = Monitor {
+            x: -1920,
+            y: -200,
+            w: 1920,
+            h: 1080,
+        };
         assert_eq!(to_host(v, mon, 0.0, 0.0), Some((-1920, -200)));
         assert_eq!(to_host(v, mon, 960.0, 540.0), Some((-960, 340)));
         let (ux, uy) = from_host(v, mon, -960, 340);
@@ -192,26 +198,44 @@ mod tests {
         // Retina-style: stream 3840x2160, host coordinates 1920x1080.
         let st = ViewState::default();
         let v = view_rect(FULL, 3840.0, 2160.0, &st, 1.0);
-        let mon = Monitor { x: 0, y: 0, w: 1920, h: 1080 };
+        let mon = Monitor {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1080,
+        };
         assert_eq!(to_host(v, mon, 1919.0, 1079.0), Some((1919, 1079)));
     }
 
     #[test]
     fn zoom_pan_keeps_edges_reachable() {
-        let mut st = ViewState { mode: ViewMode::Zoom, zoom: 2.0, pan_x: 0.0, pan_y: 0.0 };
+        let mut st = ViewState {
+            mode: ViewMode::Zoom,
+            zoom: 2.0,
+            pan_x: 0.0,
+            pan_y: 0.0,
+        };
         let v = view_rect(FULL, 1920.0, 1080.0, &st, 1.0);
         assert_eq!((v.x, v.y), (0.0, 0.0), "top-left pan shows the top-left edge");
         st.pan_x = 1.0;
         st.pan_y = 1.0;
         let v = view_rect(FULL, 1920.0, 1080.0, &st, 1.0);
         assert!((v.x + v.w - 1920.0).abs() < 0.01 && (v.y + v.h - 1080.0).abs() < 0.01);
-        let mon = Monitor { x: 0, y: 0, w: 1920, h: 1080 };
+        let mon = Monitor {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1080,
+        };
         assert_eq!(to_host(v, mon, 1919.99, 1079.99), Some((1919, 1079)));
     }
 
     #[test]
     fn original_size_is_one_stream_pixel_per_drawable_pixel() {
-        let st = ViewState { mode: ViewMode::Original, ..Default::default() };
+        let st = ViewState {
+            mode: ViewMode::Original,
+            ..Default::default()
+        };
         let v = view_rect(FULL, 2560.0, 1440.0, &st, 1.0);
         assert_eq!((v.w, v.h), (2560.0, 1440.0));
         let v = view_rect(FULL, 2560.0, 1440.0, &st, 2.0); // 4K UI plane
@@ -224,16 +248,30 @@ mod tests {
         let v = view_rect(area, 1920.0, 1080.0, &ViewState::default(), 1.0);
         assert!(v.y >= 0.0 && v.y + v.h <= area.h + 0.01);
         assert!((v.w / v.h - 16.0 / 9.0).abs() < 0.001, "aspect ratio preserved");
-        let mon = Monitor { x: 0, y: 0, w: 1920, h: 1080 };
+        let mon = Monitor {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1080,
+        };
         assert_eq!(to_host(v, mon, v.x, v.y), Some((0, 0)));
-        assert_eq!(to_host(v, mon, 100.0, 900.0), None, "keyboard area never clicks the desktop");
+        assert_eq!(
+            to_host(v, mon, 100.0, 900.0),
+            None,
+            "keyboard area never clicks the desktop"
+        );
     }
 
     #[test]
     fn portrait_monitor() {
         let v = view_rect(FULL, 1080.0, 1920.0, &ViewState::default(), 1.0);
         assert_eq!(v.h, 1080.0);
-        let mon = Monitor { x: 1920, y: 0, w: 1080, h: 1920 };
+        let mon = Monitor {
+            x: 1920,
+            y: 0,
+            w: 1080,
+            h: 1920,
+        };
         assert_eq!(to_host(v, mon, v.x, v.y), Some((1920, 0)));
     }
 }

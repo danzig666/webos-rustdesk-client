@@ -45,7 +45,11 @@ fn main() {
     let password = args.get(2).cloned().unwrap_or_default();
     let secs: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(8);
 
-    let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
     let platform = caps::detect();
     let policy = caps::HwPolicy { hardware: true };
     let dcaps = caps::decode_caps(&platform, policy, &[]);
@@ -54,7 +58,10 @@ fn main() {
     let handle_slot: Arc<Mutex<Option<session::SessionHandle>>> = Arc::new(Mutex::new(None));
     let hs = handle_slot.clone();
     let pipe = Arc::new(VideoPipeline::start(
-        PipelineConfig { hardware: platform.ndl_available, vp9_hardware: caps::vp9_in_hardware(&platform, policy, &[]) },
+        PipelineConfig {
+            hardware: platform.ndl_available,
+            vp9_hardware: caps::vp9_in_hardware(&platform, policy, &[]),
+        },
         Arc::new(move |e| {
             println!("pipeline: {e:?}");
             if let PipelineEvent::NeedKeyframe(d) = e {
@@ -65,7 +72,10 @@ fn main() {
         }),
     ));
     let audio = Arc::new(AudioRing::new(200));
-    let sink = Arc::new(Sink { video: pipe.clone(), audio: audio.clone() });
+    let sink = Arc::new(Sink {
+        video: pipe.clone(),
+        audio: audio.clone(),
+    });
     let connected = Arc::new(Mutex::new(None));
     let c2 = connected.clone();
     let p2 = pipe.clone();
@@ -82,9 +92,14 @@ fn main() {
         client_name: "RemoteDesk TV probe".into(),
         force_relay: false,
     };
-    let h = session::start(rt.handle(), req, sink, Arc::new(move |gen, e| {
-        match &e {
-            SessionEvent::Connected { peer, route, secured, .. } => {
+    let h = session::start(
+        rt.handle(),
+        req,
+        sink,
+        Arc::new(move |gen, e| match &e {
+            SessionEvent::Connected {
+                peer, route, secured, ..
+            } => {
                 println!("CONNECTED gen={gen} host={} platform={} version={} route={} secured={secured} displays={:?}",
                     peer.hostname, peer.platform, peer.version, route.label(),
                     peer.displays.iter().map(|d| (d.index, d.x, d.y, d.width, d.height, d.name.clone())).collect::<Vec<_>>());
@@ -95,8 +110,8 @@ fn main() {
             }
             SessionEvent::Cursor(c) => println!("cursor {}x{} id={}", c.width, c.height, c.id),
             other => println!("event: {other:?}"),
-        }
-    }));
+        }),
+    );
     *handle_slot.lock().unwrap() = Some(h.clone());
     let t0 = std::time::Instant::now();
     let mut sent_input = false;
@@ -109,8 +124,15 @@ fn main() {
                 input::mouse_button(input::MouseButton::Left, true, 1200, 650, Default::default()),
                 input::mouse_button(input::MouseButton::Left, false, 1200, 650, Default::default()),
             ];
-            msgs.push(input::text("echo 'Hello áéíóöőúüű ÁÉÍÓÖŐÚÜŰ' > /tmp/rdtv_typed.txt"));
-            msgs.push(input::control_key(rdtv_core::message_proto::ControlKey::Return, true, true, Default::default()));
+            msgs.push(input::text(
+                "echo 'Hello áéíóöőúüű ÁÉÍÓÖŐÚÜŰ' > /tmp/rdtv_typed.txt",
+            ));
+            msgs.push(input::control_key(
+                rdtv_core::message_proto::ControlKey::Return,
+                true,
+                true,
+                Default::default(),
+            ));
             h.send(SessionCommand::SendMany(msgs));
             println!("sent input");
         }

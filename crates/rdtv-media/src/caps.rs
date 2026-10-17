@@ -97,7 +97,11 @@ mod tests {
         };
         let c = decode_caps(&p, HwPolicy { hardware: true }, &[]);
         assert!(c.h264 && c.h265 && c.av1);
-        let c = decode_caps(&p, HwPolicy { hardware: true }, &[ndl::HwCodec::H265, ndl::HwCodec::Av1]);
+        let c = decode_caps(
+            &p,
+            HwPolicy { hardware: true },
+            &[ndl::HwCodec::H265, ndl::HwCodec::Av1],
+        );
         assert!(c.h264 && !c.h265 && !c.av1);
         let c = decode_caps(&p, HwPolicy { hardware: false }, &[]);
         assert!(!c.h264 && c.vp9);

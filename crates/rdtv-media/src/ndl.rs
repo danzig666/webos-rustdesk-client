@@ -278,7 +278,10 @@ impl NdlPlayer {
                 return Ok(false);
             }
             if !completed {
-                log::warn!("NDL: no LOADCOMPLETED after {:?}, feeding anyway", self.loaded_at.elapsed());
+                log::warn!(
+                    "NDL: no LOADCOMPLETED after {:?}, feeding anyway",
+                    self.loaded_at.elapsed()
+                );
             }
             self.feeding = true;
         }

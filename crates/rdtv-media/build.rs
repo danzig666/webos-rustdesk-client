@@ -5,7 +5,11 @@ use std::path::PathBuf;
 fn main() {
     let target = std::env::var("TARGET").unwrap();
     let root = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("../..");
-    let flavour = if target.starts_with("armv7") { "webos" } else { "host" };
+    let flavour = if target.starts_with("armv7") {
+        "webos"
+    } else {
+        "host"
+    };
     let deps = std::env::var("RDTV_DEPS_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| root.join("deps-out").join(flavour));

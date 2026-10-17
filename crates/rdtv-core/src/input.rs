@@ -398,10 +398,7 @@ mod tests {
 
     #[test]
     fn privileged_actions_use_upstream_control_keys() {
-        assert_eq!(
-            ctrl_alt_del().key_event().control_key(),
-            ControlKey::CtrlAltDel
-        );
+        assert_eq!(ctrl_alt_del().key_event().control_key(), ControlKey::CtrlAltDel);
         assert_eq!(lock_screen().key_event().control_key(), ControlKey::LockScreen);
     }
 }

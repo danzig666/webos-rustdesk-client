@@ -527,7 +527,7 @@ mod tests {
         s.remember_password("x", "1", &[1u8; 32]);
         assert!(s.delete_profile("x"));
         assert!(!s.delete_profile("public"));
-        assert!(s.secrets.passwords.get("x").is_none());
+        assert!(!s.secrets.passwords.contains_key("x"));
     }
 
     #[cfg(unix)]

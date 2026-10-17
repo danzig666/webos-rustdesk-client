@@ -10,6 +10,7 @@
 //! * Address book: Pro servers expose `POST /api/ab/personal` (guid) and
 //!   `POST /api/ab/peers?current=N&pageSize=100&ab=<guid>`; older/compatible servers expose
 //!   the legacy `GET /api/ab` whose `data` is a JSON string `{tags,peers}`.
+//!
 //! A plain OSS hbbs/hbbr has no API server: these calls then fail with a clear message and
 //! ID/password connections keep working (accounts are never faked).
 
@@ -31,9 +32,15 @@ pub struct AbPeer {
 
 #[derive(Debug, Clone)]
 pub enum LoginOutcome {
-    Token { token: String, user: String },
+    Token {
+        token: String,
+        user: String,
+    },
     /// The server wants an emailed or TOTP code.
-    NeedCode { secret: String, tfa: bool },
+    NeedCode {
+        secret: String,
+        tfa: bool,
+    },
 }
 
 pub struct Client {
@@ -72,13 +79,22 @@ impl Client {
         }
         match v.get("type").and_then(|t| t.as_str()).unwrap_or("") {
             "access_token" => {
-                let token = v.get("access_token").and_then(|t| t.as_str()).unwrap_or("").to_owned();
+                let token = v
+                    .get("access_token")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("")
+                    .to_owned();
                 if token.is_empty() {
                     bail!("Server returned an empty token");
                 }
                 let user = v
                     .get("user")
-                    .and_then(|u| u.get("display_name").and_then(|x| x.as_str()).filter(|s| !s.is_empty()).or_else(|| u.get("name").and_then(|x| x.as_str())))
+                    .and_then(|u| {
+                        u.get("display_name")
+                            .and_then(|x| x.as_str())
+                            .filter(|s| !s.is_empty())
+                            .or_else(|| u.get("name").and_then(|x| x.as_str()))
+                    })
                     .unwrap_or("")
                     .to_owned();
                 Ok(LoginOutcome::Token { token, user })
@@ -100,7 +116,13 @@ impl Client {
         self.parse_login(r.status, &r.body)
     }
 
-    pub async fn login_code(&self, username: &str, code: &str, secret: &str, tfa: bool) -> ResultType<LoginOutcome> {
+    pub async fn login_code(
+        &self,
+        username: &str,
+        code: &str,
+        secret: &str,
+        tfa: bool,
+    ) -> ResultType<LoginOutcome> {
         let mut body = json!({
             "username": username, "id": self.my_id, "uuid": self.uuid, "autoLogin": true,
             "type": "email_code", "verificationCode": code, "secret": secret, "deviceInfo": self.device_info(),
@@ -115,7 +137,13 @@ impl Client {
     /// Returns the user name, or an error (401/400 means the token is no longer valid).
     pub async fn current_user(&self, token: &str) -> ResultType<String> {
         let body = json!({ "id": self.my_id, "uuid": self.uuid });
-        let r = http::request("POST", &self.url("/api/currentUser")?, Some(token), Some(&body.to_string())).await?;
+        let r = http::request(
+            "POST",
+            &self.url("/api/currentUser")?,
+            Some(token),
+            Some(&body.to_string()),
+        )
+        .await?;
         if r.status == 401 || r.status == 400 {
             bail!("signed out by the server");
         }
@@ -216,7 +244,11 @@ fn peer_from(v: &Value) -> Option<AbPeer> {
         tags: v
             .get("tags")
             .and_then(|t| t.as_array())
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_owned())).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_str().map(|s| s.to_owned()))
+                    .collect()
+            })
             .unwrap_or_default(),
     })
 }
@@ -236,14 +268,26 @@ mod tests {
     use super::*;
 
     fn c() -> Client {
-        Client { api: "https://x".into(), my_id: "1".into(), uuid: "u".into(), device_name: "tv".into() }
+        Client {
+            api: "https://x".into(),
+            my_id: "1".into(),
+            uuid: "u".into(),
+            device_name: "tv".into(),
+        }
     }
 
     #[test]
     fn login_responses() {
-        let ok = c().parse_login(200, r#"{"type":"access_token","access_token":"T","user":{"name":"bob"}}"#).unwrap();
+        let ok = c()
+            .parse_login(
+                200,
+                r#"{"type":"access_token","access_token":"T","user":{"name":"bob"}}"#,
+            )
+            .unwrap();
         assert!(matches!(ok, LoginOutcome::Token { ref token, ref user } if token == "T" && user == "bob"));
-        let ch = c().parse_login(200, r#"{"type":"tfa_check","secret":"S"}"#).unwrap();
+        let ch = c()
+            .parse_login(200, r#"{"type":"tfa_check","secret":"S"}"#)
+            .unwrap();
         assert!(matches!(ch, LoginOutcome::NeedCode { tfa: true, .. }));
         assert!(c().parse_login(200, r#"{"error":"Wrong credentials"}"#).is_err());
         assert!(c().parse_login(404, "").is_err());
@@ -251,14 +295,19 @@ mod tests {
 
     #[test]
     fn legacy_address_book() {
-        let peers = parse_legacy_ab(r#"{"tags":["a"],"peers":[{"id":"123","alias":"Office","tags":["a"],"hash":"secret"},{"alias":"no id"}]}"#);
+        let peers = parse_legacy_ab(
+            r#"{"tags":["a"],"peers":[{"id":"123","alias":"Office","tags":["a"],"hash":"secret"},{"alias":"no id"}]}"#,
+        );
         assert_eq!(peers.len(), 1);
         assert_eq!(peers[0].alias, "Office");
     }
 
     #[test]
     fn no_api_server_is_a_clear_error() {
-        let cl = Client { api: String::new(), ..c() };
+        let cl = Client {
+            api: String::new(),
+            ..c()
+        };
         assert!(cl.url("/api/login").is_err());
     }
 }

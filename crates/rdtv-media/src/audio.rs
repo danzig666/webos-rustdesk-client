@@ -133,8 +133,8 @@ fn convert(pcm: &[f32], rate: u32, ch: u32) -> Vec<f32> {
         let i0 = pos.floor() as usize;
         let i1 = (i0 + 1).min(frames - 1);
         let t = (pos - i0 as f64) as f32;
-        for c in 0..2 {
-            out.push(stereo[i0][c] * (1.0 - t) + stereo[i1][c] * t);
+        for (a, b) in stereo[i0].iter().zip(stereo[i1].iter()) {
+            out.push(a * (1.0 - t) + b * t);
         }
     }
     out

@@ -27,7 +27,6 @@ pub mod theme {
     pub const FOCUS: Color = Color::RGB(92, 225, 250);
     pub const DANGER: Color = Color::RGB(229, 72, 77);
     pub const WARN: Color = Color::RGB(245, 176, 65);
-    pub const OK: Color = Color::RGB(70, 200, 120);
     pub const RED_KEY: Color = Color::RGB(220, 50, 50);
     pub const GREEN_KEY: Color = Color::RGB(40, 170, 70);
     pub const YELLOW_KEY: Color = Color::RGB(230, 200, 40);
@@ -41,7 +40,6 @@ pub mod size {
     pub const BODY: f32 = 28.0;
     pub const LARGE: f32 = 34.0;
     pub const TITLE: f32 = 44.0;
-    pub const HUGE: f32 = 60.0;
 }
 
 struct Glyph {
@@ -105,14 +103,6 @@ impl Gfx {
         let _ = self.canvas.fill_rect(r);
     }
 
-    pub fn outline(&mut self, r: Rect, c: Color, thickness: i32) {
-        self.canvas.set_draw_color(c);
-        for i in 0..thickness {
-            let rr = Rect::new(r.x() + i, r.y() + i, (r.width() as i32 - 2 * i).max(1) as u32, (r.height() as i32 - 2 * i).max(1) as u32);
-            let _ = self.canvas.draw_rect(rr);
-        }
-    }
-
     /// Filled rounded rectangle (corner quarter-circles from an anti-aliased texture).
     pub fn round(&mut self, r: Rect, radius: i32, c: Color) {
         let rad = radius.min(r.width() as i32 / 2).min(r.height() as i32 / 2).max(0);
@@ -121,17 +111,38 @@ impl Gfx {
         }
         let (x, y, w, h) = (r.x(), r.y(), r.width() as i32, r.height() as i32);
         self.canvas.set_draw_color(c);
-        let _ = self.canvas.fill_rect(Rect::new(x + rad, y, (w - 2 * rad) as u32, h as u32));
-        let _ = self.canvas.fill_rect(Rect::new(x, y + rad, rad as u32, (h - 2 * rad).max(0) as u32));
-        let _ = self.canvas.fill_rect(Rect::new(x + w - rad, y + rad, rad as u32, (h - 2 * rad).max(0) as u32));
+        let _ = self
+            .canvas
+            .fill_rect(Rect::new(x + rad, y, (w - 2 * rad) as u32, h as u32));
+        let _ = self
+            .canvas
+            .fill_rect(Rect::new(x, y + rad, rad as u32, (h - 2 * rad).max(0) as u32));
+        let _ = self.canvas.fill_rect(Rect::new(
+            x + w - rad,
+            y + rad,
+            rad as u32,
+            (h - 2 * rad).max(0) as u32,
+        ));
         self.circle.set_color_mod(c.r, c.g, c.b);
         self.circle.set_alpha_mod(c.a);
         let half = 32;
         let corners = [
-            (Rect::new(0, 0, half, half), Rect::new(x, y, rad as u32, rad as u32)),
-            (Rect::new(half as i32, 0, half, half), Rect::new(x + w - rad, y, rad as u32, rad as u32)),
-            (Rect::new(0, half as i32, half, half), Rect::new(x, y + h - rad, rad as u32, rad as u32)),
-            (Rect::new(half as i32, half as i32, half, half), Rect::new(x + w - rad, y + h - rad, rad as u32, rad as u32)),
+            (
+                Rect::new(0, 0, half, half),
+                Rect::new(x, y, rad as u32, rad as u32),
+            ),
+            (
+                Rect::new(half as i32, 0, half, half),
+                Rect::new(x + w - rad, y, rad as u32, rad as u32),
+            ),
+            (
+                Rect::new(0, half as i32, half, half),
+                Rect::new(x, y + h - rad, rad as u32, rad as u32),
+            ),
+            (
+                Rect::new(half as i32, half as i32, half, half),
+                Rect::new(x + w - rad, y + h - rad, rad as u32, rad as u32),
+            ),
         ];
         for (src, dst) in corners {
             let _ = self.canvas.copy(&self.circle, src, dst);
@@ -141,12 +152,23 @@ impl Gfx {
     /// Rounded outline (focus ring) drawn just outside `r`.
     pub fn round_outline(&mut self, r: Rect, radius: i32, c: Color, thickness: i32) {
         let t = thickness.max(1);
-        let (x, y, w, h) = (r.x() - t, r.y() - t, r.width() as i32 + 2 * t, r.height() as i32 + 2 * t);
+        let (x, y, w, h) = (
+            r.x() - t,
+            r.y() - t,
+            r.width() as i32 + 2 * t,
+            r.height() as i32 + 2 * t,
+        );
         let rad = (radius + t).min(w / 2).min(h / 2).max(t);
         self.fill(Rect::new(x + rad, y, (w - 2 * rad).max(0) as u32, t as u32), c);
-        self.fill(Rect::new(x + rad, y + h - t, (w - 2 * rad).max(0) as u32, t as u32), c);
+        self.fill(
+            Rect::new(x + rad, y + h - t, (w - 2 * rad).max(0) as u32, t as u32),
+            c,
+        );
         self.fill(Rect::new(x, y + rad, t as u32, (h - 2 * rad).max(0) as u32), c);
-        self.fill(Rect::new(x + w - t, y + rad, t as u32, (h - 2 * rad).max(0) as u32), c);
+        self.fill(
+            Rect::new(x + w - t, y + rad, t as u32, (h - 2 * rad).max(0) as u32),
+            c,
+        );
         let key = (rad, t);
         if !self.rings.contains_key(&key) {
             if let Ok(tex) = make_ring(self.tc, rad as u32, t as f32) {
@@ -161,7 +183,10 @@ impl Gfx {
                 (Rect::new(0, 0, rr, rr), Rect::new(x, y, rr, rr)),
                 (Rect::new(rad, 0, rr, rr), Rect::new(x + w - rad, y, rr, rr)),
                 (Rect::new(0, rad, rr, rr), Rect::new(x, y + h - rad, rr, rr)),
-                (Rect::new(rad, rad, rr, rr), Rect::new(x + w - rad, y + h - rad, rr, rr)),
+                (
+                    Rect::new(rad, rad, rr, rr),
+                    Rect::new(x + w - rad, y + h - rad, rr, rr),
+                ),
             ];
             for (src, dst) in quads {
                 let _ = self.canvas.copy(tex, src, dst);
@@ -236,7 +261,12 @@ impl Gfx {
                 tex.set_color_mod(c.r, c.g, c.b);
                 tex.set_alpha_mod(c.a);
                 let gy = y as f32 + ascent - h as f32 - ymin as f32;
-                let dst = Rect::new((pen + xmin as f32).round() as i32, gy.round() as i32, w.max(1), h.max(1));
+                let dst = Rect::new(
+                    (pen + xmin as f32).round() as i32,
+                    gy.round() as i32,
+                    w.max(1),
+                    h.max(1),
+                );
                 let _ = self.canvas.copy(tex, None, dst);
             }
             pen += adv;
@@ -245,6 +275,7 @@ impl Gfx {
     }
 
     /// Text clipped with an ellipsis to `max_w`.
+    #[allow(clippy::too_many_arguments)]
     pub fn text_fit(&mut self, s: &str, x: i32, y: i32, px: f32, bold: bool, c: Color, max_w: i32) {
         if self.text_width(s, px, bold) <= max_w {
             self.text(s, x, y, px, bold, c);
@@ -265,7 +296,14 @@ impl Gfx {
     pub fn text_centered(&mut self, s: &str, r: Rect, px: f32, bold: bool, c: Color) {
         let w = self.text_width(s, px, bold);
         let h = (px * self.ui_scale * 1.15) as i32;
-        self.text(s, r.x() + (r.width() as i32 - w) / 2, r.y() + (r.height() as i32 - h) / 2, px, bold, c);
+        self.text(
+            s,
+            r.x() + (r.width() as i32 - w) / 2,
+            r.y() + (r.height() as i32 - h) / 2,
+            px,
+            bold,
+            c,
+        );
     }
 
     pub fn line_height(&self, px: f32) -> i32 {
@@ -279,7 +317,11 @@ impl Gfx {
         for para in s.split('\n') {
             let mut line = String::new();
             for word in para.split(' ') {
-                let cand = if line.is_empty() { word.to_owned() } else { format!("{line} {word}") };
+                let cand = if line.is_empty() {
+                    word.to_owned()
+                } else {
+                    format!("{line} {word}")
+                };
                 if self.text_width(&cand, px, false) > max_w && !line.is_empty() {
                     self.text(&line, x, cy, px, false, c);
                     cy += lh;
@@ -314,12 +356,17 @@ fn make_circle(tc: &'static TextureCreator<WindowContext>, d: u32) -> anyhow::Re
             px.extend_from_slice(&[255, 255, 255, a]);
         }
     }
-    t.update(None, &px, (d * 4) as usize).map_err(|e| anyhow::anyhow!("{e}"))?;
+    t.update(None, &px, (d * 4) as usize)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
     t.set_blend_mode(BlendMode::Blend);
     Ok(t)
 }
 
-fn make_ring(tc: &'static TextureCreator<WindowContext>, rad: u32, t: f32) -> anyhow::Result<Texture<'static>> {
+fn make_ring(
+    tc: &'static TextureCreator<WindowContext>,
+    rad: u32,
+    t: f32,
+) -> anyhow::Result<Texture<'static>> {
     let d = rad * 2;
     let mut tex = tc
         .create_texture_static(PixelFormatEnum::ABGR8888, d, d)
@@ -336,7 +383,8 @@ fn make_ring(tc: &'static TextureCreator<WindowContext>, rad: u32, t: f32) -> an
             px.extend_from_slice(&[255, 255, 255, (outer * inner * 255.0) as u8]);
         }
     }
-    tex.update(None, &px, (d * 4) as usize).map_err(|e| anyhow::anyhow!("{e}"))?;
+    tex.update(None, &px, (d * 4) as usize)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
     tex.set_blend_mode(BlendMode::Blend);
     Ok(tex)
 }

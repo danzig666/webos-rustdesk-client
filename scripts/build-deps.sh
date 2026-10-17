@@ -103,5 +103,8 @@ if [ "$TARGET" = webos ] && [ ! -f "$OUT/lib/libSDL2-2.0.so.0" ]; then
   mkdir -p "$OUT/include" && cp -a "$OUT/sdl2/include/SDL2" "$OUT/include/"
   mkdir -p "$OUT/licenses" && cp -a "$OUT/sdl2/share/licenses/SDL2" "$OUT/licenses/" 2>/dev/null || true
 fi
+mkdir -p "$OUT/licenses/libvpx" "$OUT/licenses/opus"
+cp "$SRC/libvpx-$VPX_VER/LICENSE" "$SRC/libvpx-$VPX_VER/PATENTS" "$OUT/licenses/libvpx/" 2>/dev/null || true
+tar xzf "$SRC/opus-$OPUS_VER.tar.gz" -C "$OUT/licenses/opus" --strip-components=1 "opus-$OPUS_VER/COPYING" 2>/dev/null || true
 echo "deps ready in $OUT"
 ls -la "$OUT/lib"/

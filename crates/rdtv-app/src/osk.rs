@@ -88,16 +88,133 @@ fn rows(layout: KeyboardLayout, mac: bool) -> Vec<Vec<(K, f32)>> {
     let _ = win;
     match layout {
         KeyboardLayout::EnUs => vec![
-            vec![ch('`', '~'), ch('1', '!'), ch('2', '@'), ch('3', '#'), ch('4', '$'), ch('5', '%'), ch('6', '^'), ch('7', '&'), ch('8', '*'), ch('9', '('), ch('0', ')'), ch('-', '_'), ch('=', '+'), (K::Backspace, 2.0)],
-            vec![(K::Ctrl("Tab", ControlKey::Tab), 1.5), ch('q', 'Q'), ch('w', 'W'), ch('e', 'E'), ch('r', 'R'), ch('t', 'T'), ch('y', 'Y'), ch('u', 'U'), ch('i', 'I'), ch('o', 'O'), ch('p', 'P'), ch('[', '{'), ch(']', '}'), (K::Ch('\\', '|', None), 1.5)],
-            vec![(K::Ctrl("Caps", ControlKey::CapsLock), 1.8), ch('a', 'A'), ch('s', 'S'), ch('d', 'D'), ch('f', 'F'), ch('g', 'G'), ch('h', 'H'), ch('j', 'J'), ch('k', 'K'), ch('l', 'L'), ch(';', ':'), ch('\'', '"'), (K::Enter, 2.2)],
-            vec![(K::Mod(M_SHIFT), 2.3), ch('z', 'Z'), ch('x', 'X'), ch('c', 'C'), ch('v', 'V'), ch('b', 'B'), ch('n', 'N'), ch('m', 'M'), ch(',', '<'), ch('.', '>'), ch('/', '?'), (K::Ctrl("↑", ControlKey::UpArrow), 1.0), (K::Mod(M_SHIFT), 1.7)],
+            vec![
+                ch('`', '~'),
+                ch('1', '!'),
+                ch('2', '@'),
+                ch('3', '#'),
+                ch('4', '$'),
+                ch('5', '%'),
+                ch('6', '^'),
+                ch('7', '&'),
+                ch('8', '*'),
+                ch('9', '('),
+                ch('0', ')'),
+                ch('-', '_'),
+                ch('=', '+'),
+                (K::Backspace, 2.0),
+            ],
+            vec![
+                (K::Ctrl("Tab", ControlKey::Tab), 1.5),
+                ch('q', 'Q'),
+                ch('w', 'W'),
+                ch('e', 'E'),
+                ch('r', 'R'),
+                ch('t', 'T'),
+                ch('y', 'Y'),
+                ch('u', 'U'),
+                ch('i', 'I'),
+                ch('o', 'O'),
+                ch('p', 'P'),
+                ch('[', '{'),
+                ch(']', '}'),
+                (K::Ch('\\', '|', None), 1.5),
+            ],
+            vec![
+                (K::Ctrl("Caps", ControlKey::CapsLock), 1.8),
+                ch('a', 'A'),
+                ch('s', 'S'),
+                ch('d', 'D'),
+                ch('f', 'F'),
+                ch('g', 'G'),
+                ch('h', 'H'),
+                ch('j', 'J'),
+                ch('k', 'K'),
+                ch('l', 'L'),
+                ch(';', ':'),
+                ch('\'', '"'),
+                (K::Enter, 2.2),
+            ],
+            vec![
+                (K::Mod(M_SHIFT), 2.3),
+                ch('z', 'Z'),
+                ch('x', 'X'),
+                ch('c', 'C'),
+                ch('v', 'V'),
+                ch('b', 'B'),
+                ch('n', 'N'),
+                ch('m', 'M'),
+                ch(',', '<'),
+                ch('.', '>'),
+                ch('/', '?'),
+                (K::Ctrl("↑", ControlKey::UpArrow), 1.0),
+                (K::Mod(M_SHIFT), 1.7),
+            ],
         ],
         KeyboardLayout::Hu => vec![
-            vec![cha('0', '§', '¬'), cha('1', '\'', '~'), cha('2', '"', 'ˇ'), cha('3', '+', '^'), cha('4', '!', '˘'), cha('5', '%', '°'), cha('6', '/', '˛'), cha('7', '=', '`'), cha('8', '(', '˙'), cha('9', ')', '´'), ch('ö', 'Ö'), ch('ü', 'Ü'), ch('ó', 'Ó'), (K::Backspace, 2.0)],
-            vec![(K::Ctrl("Tab", ControlKey::Tab), 1.5), cha('q', 'Q', '\\'), cha('w', 'W', '|'), cha('e', 'E', 'Ä'), ch('r', 'R'), ch('t', 'T'), cha('z', 'Z', '€'), cha('u', 'U', '€'), cha('i', 'I', 'Í'), ch('o', 'O'), ch('p', 'P'), cha('ő', 'Ő', '÷'), cha('ú', 'Ú', '×'), (K::Ch('ű', 'Ű', Some('¤')), 1.5)],
-            vec![(K::Ctrl("Caps", ControlKey::CapsLock), 1.8), cha('a', 'A', 'ä'), cha('s', 'S', 'đ'), cha('d', 'D', 'Đ'), cha('f', 'F', '['), cha('g', 'G', ']'), ch('h', 'H'), cha('j', 'J', 'í'), cha('k', 'K', 'ł'), cha('l', 'L', 'Ł'), cha('é', 'É', '$'), cha('á', 'Á', 'ß'), (K::Enter, 2.2)],
-            vec![(K::Mod(M_SHIFT), 1.3), cha('í', 'Í', '<'), cha('y', 'Y', '>'), cha('x', 'X', '#'), cha('c', 'C', '&'), cha('v', 'V', '@'), cha('b', 'B', '{'), cha('n', 'N', '}'), ch('m', 'M'), cha(',', '?', ';'), cha('.', ':', '>'), cha('-', '_', '*'), (K::Ctrl("↑", ControlKey::UpArrow), 1.0), (K::Mod(M_SHIFT), 1.7)],
+            vec![
+                cha('0', '§', '¬'),
+                cha('1', '\'', '~'),
+                cha('2', '"', 'ˇ'),
+                cha('3', '+', '^'),
+                cha('4', '!', '˘'),
+                cha('5', '%', '°'),
+                cha('6', '/', '˛'),
+                cha('7', '=', '`'),
+                cha('8', '(', '˙'),
+                cha('9', ')', '´'),
+                ch('ö', 'Ö'),
+                ch('ü', 'Ü'),
+                ch('ó', 'Ó'),
+                (K::Backspace, 2.0),
+            ],
+            vec![
+                (K::Ctrl("Tab", ControlKey::Tab), 1.5),
+                cha('q', 'Q', '\\'),
+                cha('w', 'W', '|'),
+                cha('e', 'E', 'Ä'),
+                ch('r', 'R'),
+                ch('t', 'T'),
+                cha('z', 'Z', '€'),
+                cha('u', 'U', '€'),
+                cha('i', 'I', 'Í'),
+                ch('o', 'O'),
+                ch('p', 'P'),
+                cha('ő', 'Ő', '÷'),
+                cha('ú', 'Ú', '×'),
+                (K::Ch('ű', 'Ű', Some('¤')), 1.5),
+            ],
+            vec![
+                (K::Ctrl("Caps", ControlKey::CapsLock), 1.8),
+                cha('a', 'A', 'ä'),
+                cha('s', 'S', 'đ'),
+                cha('d', 'D', 'Đ'),
+                cha('f', 'F', '['),
+                cha('g', 'G', ']'),
+                ch('h', 'H'),
+                cha('j', 'J', 'í'),
+                cha('k', 'K', 'ł'),
+                cha('l', 'L', 'Ł'),
+                cha('é', 'É', '$'),
+                cha('á', 'Á', 'ß'),
+                (K::Enter, 2.2),
+            ],
+            vec![
+                (K::Mod(M_SHIFT), 1.3),
+                cha('í', 'Í', '<'),
+                cha('y', 'Y', '>'),
+                cha('x', 'X', '#'),
+                cha('c', 'C', '&'),
+                cha('v', 'V', '@'),
+                cha('b', 'B', '{'),
+                cha('n', 'N', '}'),
+                ch('m', 'M'),
+                cha(',', '?', ';'),
+                cha('.', ':', '>'),
+                cha('-', '_', '*'),
+                (K::Ctrl("↑", ControlKey::UpArrow), 1.0),
+                (K::Mod(M_SHIFT), 1.7),
+            ],
         ],
     }
 }
@@ -125,9 +242,18 @@ fn bottom_row(mode: Mode) -> Vec<(K, f32)> {
 fn fn_row() -> Vec<(K, f32)> {
     let mut v = vec![(K::Ctrl("Esc", ControlKey::Escape), 1.2)];
     let f = [
-        ("F1", ControlKey::F1), ("F2", ControlKey::F2), ("F3", ControlKey::F3), ("F4", ControlKey::F4),
-        ("F5", ControlKey::F5), ("F6", ControlKey::F6), ("F7", ControlKey::F7), ("F8", ControlKey::F8),
-        ("F9", ControlKey::F9), ("F10", ControlKey::F10), ("F11", ControlKey::F11), ("F12", ControlKey::F12),
+        ("F1", ControlKey::F1),
+        ("F2", ControlKey::F2),
+        ("F3", ControlKey::F3),
+        ("F4", ControlKey::F4),
+        ("F5", ControlKey::F5),
+        ("F6", ControlKey::F6),
+        ("F7", ControlKey::F7),
+        ("F8", ControlKey::F8),
+        ("F9", ControlKey::F9),
+        ("F10", ControlKey::F10),
+        ("F11", ControlKey::F11),
+        ("F12", ControlKey::F12),
     ];
     for (n, k) in f {
         v.push((K::Ctrl(n, k), 1.0));
@@ -140,18 +266,46 @@ fn fn_row() -> Vec<(K, f32)> {
 
 fn nav_cluster() -> Vec<Vec<(K, f32)>> {
     vec![
-        vec![(K::Ctrl("Ins", ControlKey::Insert), 1.0), (K::Ctrl("Home", ControlKey::Home), 1.0), (K::Ctrl("PgUp", ControlKey::PageUp), 1.0)],
-        vec![(K::Ctrl("Del", ControlKey::Delete), 1.0), (K::Ctrl("End", ControlKey::End), 1.0), (K::Ctrl("PgDn", ControlKey::PageDown), 1.0)],
+        vec![
+            (K::Ctrl("Ins", ControlKey::Insert), 1.0),
+            (K::Ctrl("Home", ControlKey::Home), 1.0),
+            (K::Ctrl("PgUp", ControlKey::PageUp), 1.0),
+        ],
+        vec![
+            (K::Ctrl("Del", ControlKey::Delete), 1.0),
+            (K::Ctrl("End", ControlKey::End), 1.0),
+            (K::Ctrl("PgDn", ControlKey::PageDown), 1.0),
+        ],
     ]
 }
 
 fn numpad() -> Vec<Vec<(K, f32)>> {
     let n = |l: &'static str, k| (K::Ctrl(l, k), 1.0);
     vec![
-        vec![n("Num", ControlKey::NumLock), n("/", ControlKey::Divide), n("*", ControlKey::Multiply), n("-", ControlKey::Subtract)],
-        vec![n("7", ControlKey::Numpad7), n("8", ControlKey::Numpad8), n("9", ControlKey::Numpad9), n("+", ControlKey::Add)],
-        vec![n("4", ControlKey::Numpad4), n("5", ControlKey::Numpad5), n("6", ControlKey::Numpad6), n("Ent", ControlKey::NumpadEnter)],
-        vec![n("1", ControlKey::Numpad1), n("2", ControlKey::Numpad2), n("3", ControlKey::Numpad3), n("0", ControlKey::Numpad0)],
+        vec![
+            n("Num", ControlKey::NumLock),
+            n("/", ControlKey::Divide),
+            n("*", ControlKey::Multiply),
+            n("-", ControlKey::Subtract),
+        ],
+        vec![
+            n("7", ControlKey::Numpad7),
+            n("8", ControlKey::Numpad8),
+            n("9", ControlKey::Numpad9),
+            n("+", ControlKey::Add),
+        ],
+        vec![
+            n("4", ControlKey::Numpad4),
+            n("5", ControlKey::Numpad5),
+            n("6", ControlKey::Numpad6),
+            n("Ent", ControlKey::NumpadEnter),
+        ],
+        vec![
+            n("1", ControlKey::Numpad1),
+            n("2", ControlKey::Numpad2),
+            n("3", ControlKey::Numpad3),
+            n("0", ControlKey::Numpad0),
+        ],
     ]
 }
 
@@ -237,7 +391,11 @@ impl Osk {
                     }
                 }
                 let upper = shift ^ (self.caps && n.is_alphabetic());
-                if upper { s.to_string() } else { n.to_string() }
+                if upper {
+                    s.to_string()
+                } else {
+                    n.to_string()
+                }
             }
             K::Ctrl(l, _) => l.to_string(),
             K::Mod(i) => {
@@ -251,7 +409,13 @@ impl Osk {
             }
             K::Space => "Space".into(),
             K::Backspace => "⌫ Backspace".into(),
-            K::Enter => if self.mode == Mode::Local { "Done".into() } else { "Enter ⏎".into() },
+            K::Enter => {
+                if self.mode == Mode::Local {
+                    "Done".into()
+                } else {
+                    "Enter ⏎".into()
+                }
+            }
             K::Layout => match self.layout {
                 KeyboardLayout::EnUs => "EN→HU".into(),
                 KeyboardLayout::Hu => "HU→EN".into(),
@@ -263,7 +427,9 @@ impl Osk {
     }
 
     fn press(&mut self, k: K, out: &mut Vec<OskAction>) {
-        let hotkey = self.mods[M_CTRL] != ModState::Off || self.mods[M_ALT] != ModState::Off || self.mods[M_WIN] != ModState::Off;
+        let hotkey = self.mods[M_CTRL] != ModState::Off
+            || self.mods[M_ALT] != ModState::Off
+            || self.mods[M_WIN] != ModState::Off;
         match k {
             K::Mod(i) => {
                 self.mods[i] = match self.mods[i] {
@@ -279,7 +445,10 @@ impl Osk {
                 if self.mode == Mode::Remote && hotkey && !altgr {
                     // Shortcut: base character plus modifiers (e.g. Ctrl+C, Win+D).
                     let base = if n.is_ascii() { n } else { s.to_ascii_lowercase() };
-                    let chord = Chord { mods: self.mods_now(), key: ChordKey::Char(base.to_ascii_lowercase()) };
+                    let chord = Chord {
+                        mods: self.mods_now(),
+                        key: ChordKey::Char(base.to_ascii_lowercase()),
+                    };
                     let mut names = self.mod_names_now();
                     names.push(base.to_ascii_uppercase().to_string());
                     self.last_chord = Some(names);
@@ -289,7 +458,11 @@ impl Osk {
                         a.unwrap_or(n)
                     } else {
                         let upper = shift ^ (self.caps && n.is_alphabetic());
-                        if upper { s } else { n }
+                        if upper {
+                            s
+                        } else {
+                            n
+                        }
                     };
                     out.push(OskAction::Text(c.to_string()));
                 }
@@ -303,7 +476,10 @@ impl Osk {
                     let mut names = self.mod_names_now();
                     names.push(name.to_owned());
                     self.last_chord = Some(names);
-                    out.push(OskAction::Chord(Chord { mods: self.mods_now(), key: ChordKey::Control(ck) }));
+                    out.push(OskAction::Chord(Chord {
+                        mods: self.mods_now(),
+                        key: ChordKey::Control(ck),
+                    }));
                 } else {
                     match ck {
                         ControlKey::Delete => out.push(OskAction::Backspace),
@@ -315,7 +491,10 @@ impl Osk {
             }
             K::Space => {
                 if self.mode == Mode::Remote && hotkey {
-                    out.push(OskAction::Chord(Chord { mods: self.mods_now(), key: ChordKey::Control(ControlKey::Space) }));
+                    out.push(OskAction::Chord(Chord {
+                        mods: self.mods_now(),
+                        key: ChordKey::Control(ControlKey::Space),
+                    }));
                 } else {
                     out.push(OskAction::Text(" ".into()));
                 }
@@ -323,7 +502,10 @@ impl Osk {
             }
             K::Backspace => {
                 if self.mode == Mode::Remote {
-                    out.push(OskAction::Chord(Chord { mods: self.mods_now(), key: ChordKey::Control(ControlKey::Backspace) }));
+                    out.push(OskAction::Chord(Chord {
+                        mods: self.mods_now(),
+                        key: ChordKey::Control(ControlKey::Backspace),
+                    }));
                 } else {
                     out.push(OskAction::Backspace);
                 }
@@ -331,7 +513,10 @@ impl Osk {
             }
             K::Enter => {
                 if self.mode == Mode::Remote {
-                    out.push(OskAction::Chord(Chord { mods: self.mods_now(), key: ChordKey::Control(ControlKey::Return) }));
+                    out.push(OskAction::Chord(Chord {
+                        mods: self.mods_now(),
+                        key: ChordKey::Control(ControlKey::Return),
+                    }));
                 } else {
                     out.push(OskAction::Submit);
                 }
@@ -355,7 +540,10 @@ impl Osk {
         let mut out = Vec::new();
         let h = self.height();
         let top = H - h;
-        f.g.fill(Rect::new(0, top, W as u32, h as u32), Color::RGBA(14, 22, 40, 245));
+        f.g.fill(
+            Rect::new(0, top, W as u32, h as u32),
+            Color::RGBA(14, 22, 40, 245),
+        );
         f.g.fill(Rect::new(0, top, W as u32, 3), theme::ACCENT);
         let key_h = 64;
         let gap = 10;
@@ -379,9 +567,23 @@ impl Osk {
                     break;
                 }
                 let r = Rect::new(x, y, w as u32, key_h as u32);
-                let label = if self.remove_mode { format!("✕ {}", s.label) } else { s.label.clone() };
+                let label = if self.remove_mode {
+                    format!("✕ {}", s.label)
+                } else {
+                    s.label.clone()
+                };
                 let (foc, act) = f.register(idx("osk-sc", i), r);
-                f.g.round(r, 12, if self.remove_mode { theme::DANGER } else if foc { theme::PANEL_HI } else { theme::ROW });
+                f.g.round(
+                    r,
+                    12,
+                    if self.remove_mode {
+                        theme::DANGER
+                    } else if foc {
+                        theme::PANEL_HI
+                    } else {
+                        theme::ROW
+                    },
+                );
                 if foc {
                     f.focus_ring(r, 12);
                 }
@@ -410,7 +612,12 @@ impl Osk {
                 }
             }
             let rm_r = Rect::new(main_w - 120, y, 150, key_h as u32);
-            if f.button(idx("osk-sc-rm", 0), rm_r, if self.remove_mode { "Done" } else { "Remove…" }, false) {
+            if f.button(
+                idx("osk-sc-rm", 0),
+                rm_r,
+                if self.remove_mode { "Done" } else { "Remove…" },
+                false,
+            ) {
                 self.remove_mode = !self.remove_mode;
             }
             y += key_h + gap;
@@ -431,25 +638,47 @@ impl Osk {
                 let w = unit * wu + gap as f32 * (wu - 1.0).max(0.0);
                 let r = Rect::new(x.round() as i32, y, w.round() as u32, key_h as u32);
                 let label = self.key_label(k);
-                let id = if matches!(k, K::Enter) { crate::ui::id("osk-enter") } else { idx("osk-key", kid) };
+                let id = if matches!(k, K::Enter) {
+                    crate::ui::id("osk-enter")
+                } else {
+                    idx("osk-key", kid)
+                };
                 kid += 1;
                 let (foc, act) = f.register(id, r);
                 let (bg, state_txt) = match k {
                     K::Mod(i) => match self.mods[*i] {
-                        ModState::Off => (if foc { theme::PANEL_HI } else { Color::RGB(40, 55, 85) }, ""),
+                        ModState::Off => (
+                            if foc {
+                                theme::PANEL_HI
+                            } else {
+                                Color::RGB(40, 55, 85)
+                            },
+                            "",
+                        ),
                         ModState::OneShot => (theme::ACCENT, "once"),
                         ModState::Locked => (Color::RGB(0, 150, 120), "locked"),
                     },
                     K::Ctrl(_, ControlKey::CapsLock) if self.caps => (Color::RGB(0, 150, 120), "on"),
                     K::Close => (Color::RGB(70, 40, 50), ""),
                     K::Ch(..) | K::Space => (if foc { theme::PANEL_HI } else { theme::ROW }, ""),
-                    _ => (if foc { theme::PANEL_HI } else { Color::RGB(40, 55, 85) }, ""),
+                    _ => (
+                        if foc {
+                            theme::PANEL_HI
+                        } else {
+                            Color::RGB(40, 55, 85)
+                        },
+                        "",
+                    ),
                 };
                 f.g.round(r, 10, bg);
                 if foc {
                     f.focus_ring(r, 10);
                 }
-                let px = if label.chars().count() > 2 { size::SMALL } else { size::LARGE };
+                let px = if label.chars().count() > 2 {
+                    size::SMALL
+                } else {
+                    size::LARGE
+                };
                 if state_txt.is_empty() {
                     f.g.text_centered(&label, r, px, true, theme::TEXT);
                 } else {
@@ -478,7 +707,15 @@ impl Osk {
                     kid += 1;
                     let label = self.key_label(&k);
                     let (foc, act) = f.register(id, r);
-                    f.g.round(r, 10, if foc { theme::PANEL_HI } else { Color::RGB(40, 55, 85) });
+                    f.g.round(
+                        r,
+                        10,
+                        if foc {
+                            theme::PANEL_HI
+                        } else {
+                            Color::RGB(40, 55, 85)
+                        },
+                    );
                     if foc {
                         f.focus_ring(r, 10);
                     }
@@ -525,7 +762,12 @@ mod tests {
 
     fn press_char(o: &mut Osk, n: char) -> Vec<OskAction> {
         let rows = rows(o.layout, false);
-        let k = rows.iter().flatten().find(|(k, _)| matches!(k, K::Ch(c, _, _) if *c == n)).unwrap().0;
+        let k = rows
+            .iter()
+            .flatten()
+            .find(|(k, _)| matches!(k, K::Ch(c, _, _) if *c == n))
+            .unwrap()
+            .0;
         let mut out = Vec::new();
         o.press(k, &mut out);
         out

@@ -68,9 +68,8 @@ impl VpxDecoder {
             if img.fmt != 0 {
                 bail!("unsupported vpx output format {}", img.fmt);
             }
-            last = unsafe {
-                YuvFrame::copy_i420(img.planes, img.strides, img.width as u32, img.height as u32)
-            };
+            last =
+                unsafe { YuvFrame::copy_i420(img.planes, img.strides, img.width as u32, img.height as u32) };
         }
         Ok(last)
     }

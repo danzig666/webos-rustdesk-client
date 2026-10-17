@@ -14,6 +14,9 @@ mod view;
 use std::time::{Duration, Instant};
 
 fn main() {
+    if std::env::args().any(|a| a == "--self-test") {
+        std::process::exit(self_test());
+    }
     if let Err(e) = run() {
         log::error!("fatal: {e:#}");
         eprintln!("fatal: {e:#}");
@@ -82,4 +85,71 @@ fn run() -> anyhow::Result<()> {
     rdtv_media::ndl::quit();
     log::info!("exit");
     Ok(())
+}
+
+/// Non-graphical self test (used by CI under qemu-arm and over SSH on a TV): exercises the
+/// statically linked decoders, crypto, storage and the NDL probe. Exit code 0 = all passed.
+fn self_test() -> i32 {
+    let mut ok = true;
+    let mut check = |name: &str, r: Result<String, String>| match &r {
+        Ok(d) => println!("PASS {name}: {d}"),
+        Err(e) => {
+            println!("FAIL {name}: {e}");
+            ok = false;
+        }
+    };
+    check(
+        "libvpx vp9",
+        rdtv_media::vpx::VpxDecoder::new(true)
+            .map(|_| "decoder created".into())
+            .map_err(|e| e.to_string()),
+    );
+    check(
+        "libvpx vp8",
+        rdtv_media::vpx::VpxDecoder::new(false)
+            .map(|_| "decoder created".into())
+            .map_err(|e| e.to_string()),
+    );
+    check(
+        "libopus",
+        rdtv_media::opus::OpusDecoder::new(48000, 2)
+            .map(|_| "decoder created".into())
+            .map_err(|e| e.to_string()),
+    );
+    check("sodium", {
+        use rdtv_core::hbb_common::sodiumoxide::crypto::box_;
+        let (pk, _) = box_::gen_keypair();
+        Ok(format!("keypair {} bytes", pk.0.len()))
+    });
+    check(
+        "server key",
+        rdtv_core::transport::get_rs_pk(rdtv_core::hbb_common::config::RS_PUB_KEY)
+            .map(|_| "public server key decodes".into())
+            .ok_or_else(|| "bad key".into()),
+    );
+    let dir = std::env::temp_dir().join(format!("rdtv-selftest-{}", std::process::id()));
+    check("store", {
+        let s = rdtv_core::store::Store::open(&dir);
+        s.save();
+        let r = if dir.join("state.json").exists() {
+            Ok(format!("client id {}", s.state.client_id.len()))
+        } else {
+            Err("state not written".into())
+        };
+        let _ = std::fs::remove_dir_all(&dir);
+        r
+    });
+    let p = rdtv_media::caps::detect();
+    println!("INFO webOS release: {:?}", p.webos_release);
+    println!(
+        "INFO NDL: {}",
+        p.ndl_error.clone().unwrap_or_else(|| "available".into())
+    );
+    let caps = rdtv_media::caps::decode_caps(&p, rdtv_media::caps::HwPolicy { hardware: true }, &[]);
+    println!("INFO advertised codecs: {caps:?}");
+    if ok {
+        0
+    } else {
+        1
+    }
 }

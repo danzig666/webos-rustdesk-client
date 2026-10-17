@@ -17,6 +17,7 @@
 //! whether the channel is end-to-end encrypted so the UI can show it.
 
 use crate::profile::ServerProfile;
+use base::message_proto::*;
 use hbb_common::{
     anyhow::{anyhow, bail, Context},
     config::{CONNECT_TIMEOUT, READ_TIMEOUT, RELAY_PORT, RENDEZVOUS_PORT},
@@ -27,7 +28,6 @@ use hbb_common::{
     tokio::time::timeout,
     AddrMangle, ResultType, Stream,
 };
-use base::message_proto::*;
 use std::{net::SocketAddr, time::Instant};
 
 /// Version string announced to rendezvous servers and hosts. This client implements the
@@ -122,13 +122,8 @@ pub fn get_rs_pk(str_base64: &str) -> Option<sign::PublicKey> {
         .map(sign::PublicKey)
 }
 
-fn decode_id_pk(
-    signed: &[u8],
-    key: &sign::PublicKey,
-) -> ResultType<(String, [u8; 32], u32)> {
-    let res = IdPk::parse_from_bytes(
-        &sign::verify(signed, key).map_err(|_| anyhow!("Signature mismatch"))?,
-    )?;
+fn decode_id_pk(signed: &[u8], key: &sign::PublicKey) -> ResultType<(String, [u8; 32], u32)> {
+    let res = IdPk::parse_from_bytes(&sign::verify(signed, key).map_err(|_| anyhow!("Signature mismatch"))?)?;
     if let Some(pk) = get_pk(&res.pk) {
         Ok((res.id, pk, res.kx_version))
     } else {
@@ -164,72 +159,6 @@ async fn get_next_nonkeyexchange_msg(
         break;
     }
     None
-}
-
-/// Upstream `key_exchange` with the rendezvous server (used when a token is present).
-/// Kept for completeness of the port; the plain-ID flow does not require it.
-#[allow(dead_code)]
-async fn rendezvous_key_exchange(conn: &mut Stream, key: &str) -> ResultType<bool> {
-    let Some(rs_pk) = get_rs_pk(key) else {
-        bail!("Handshake failed: invalid public key from rendezvous server");
-    };
-    match timeout(std::time::Duration::from_millis(READ_TIMEOUT), conn.next()).await? {
-        Some(Ok(bytes)) => {
-            if let Ok(msg_in) = RendezvousMessage::parse_from_bytes(&bytes) {
-                if let Some(rendezvous_message::Union::KeyExchange(ex)) = msg_in.union {
-                    if ex.keys.len() != 1 {
-                        bail!("Handshake failed: invalid key exchange message");
-                    }
-                    let their_pk_b = sign::verify(&ex.keys[0], &rs_pk)
-                        .map_err(|_| anyhow!("Signature mismatch in key exchange"))?;
-                    let their_pk_b =
-                        get_pk(&their_pk_b).context("Wrong their public length in key exchange")?;
-                    if their_pk_b[31] & 0x80 != 0 || !ex.signed_params.is_empty() {
-                        let params = sign::verify(&ex.signed_params, &rs_pk)
-                            .ok()
-                            .and_then(|signed| {
-                                let params =
-                                    signed.strip_prefix(hbb_common::tcp::KX_PARAMS_DOMAIN)?;
-                                KxParams::parse_from_bytes(params).ok()
-                            })
-                            .ok_or_else(|| {
-                                anyhow!("Missing or invalid signed key exchange parameters")
-                            })?;
-                        if params.pk[..] != their_pk_b[..] || params.version != ex.version {
-                            bail!("Key exchange version or public key does not match its signature");
-                        }
-                    }
-                    let (asymmetric_value, symmetric_value, key) =
-                        create_symmetric_key_msg(their_pk_b);
-                    let picked = hbb_common::tcp::kx_version_for(ex.version);
-                    let mut msg_out = RendezvousMessage::new();
-                    msg_out.set_key_exchange(KeyExchange {
-                        keys: vec![asymmetric_value.clone(), symmetric_value],
-                        version: picked,
-                        ..Default::default()
-                    });
-                    timeout(
-                        std::time::Duration::from_millis(CONNECT_TIMEOUT),
-                        conn.send(&msg_out),
-                    )
-                    .await??;
-                    conn.set_negotiated_key(
-                        key,
-                        true,
-                        &hbb_common::tcp::KxTranscript {
-                            initiator_pk: &asymmetric_value,
-                            responder_pk: &their_pk_b,
-                            advertised: ex.version,
-                            picked,
-                        },
-                    )?;
-                    return Ok(true);
-                }
-            }
-        }
-        _ => {}
-    }
-    Ok(false)
 }
 
 /// Port of upstream `Client::secure_connection` (non-WebRTC branch).
@@ -373,8 +302,7 @@ async fn request_relay(
             ..Default::default()
         });
         socket.send(&msg_out).await?;
-        if let Some(msg_in) = get_next_nonkeyexchange_msg(&mut socket, Some(CONNECT_TIMEOUT)).await
-        {
+        if let Some(msg_in) = get_next_nonkeyexchange_msg(&mut socket, Some(CONNECT_TIMEOUT)).await {
             if let Some(rendezvous_message::Union::RelayResponse(rs)) = msg_in.union {
                 if !rs.refuse_reason.is_empty() {
                     bail!(rs.refuse_reason);
@@ -410,8 +338,7 @@ pub async fn establish(
             // No rendezvous-signed key exists for direct addresses: upstream sends an empty
             // message and proceeds unencrypted-at-handshake (the host decides whether direct
             // access is permitted at all).
-            let (peer_pk, secured) =
-                secure_connection(addr, Vec::new(), &key, &mut stream).await?;
+            let (peer_pk, secured) = secure_connection(addr, Vec::new(), &key, &mut stream).await?;
             Ok(Established {
                 stream,
                 route: Route::DirectAddress,
@@ -480,8 +407,7 @@ async fn establish_by_id(
                 break;
             }
             let Some(msg_in) =
-                get_next_nonkeyexchange_msg(&mut socket, Some(remaining.as_millis().max(1) as u64))
-                    .await
+                get_next_nonkeyexchange_msg(&mut socket, Some(remaining.as_millis().max(1) as u64)).await
             else {
                 break;
             };
@@ -520,11 +446,9 @@ async fn establish_by_id(
                     start = Instant::now();
                     signed_id_pk = rr.pk().into();
                     let mut conn =
-                        create_relay(peer, rr.uuid, rr.relay_server, key, my_addr.is_ipv4())
-                            .await?;
+                        create_relay(peer, rr.uuid, rr.relay_server, key, my_addr.is_ipv4()).await?;
                     log::info!("{:?} used to establish relay connection", start.elapsed());
-                    let (peer_pk, secured) =
-                        secure_connection(peer, signed_id_pk, key, &mut conn).await?;
+                    let (peer_pk, secured) = secure_connection(peer, signed_id_pk, key, &mut conn).await?;
                     return Ok(Established {
                         stream: conn,
                         route: Route::Relay,
@@ -590,7 +514,10 @@ mod tests {
 
     #[test]
     fn target_parsing() {
-        assert_eq!(Target::parse(" 123 456 789 "), Some(Target::Id("123456789".into())));
+        assert_eq!(
+            Target::parse(" 123 456 789 "),
+            Some(Target::Id("123456789".into()))
+        );
         assert_eq!(
             Target::parse("192.168.1.20"),
             Some(Target::Address("192.168.1.20".into()))

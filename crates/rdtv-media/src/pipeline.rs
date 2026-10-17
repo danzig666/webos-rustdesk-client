@@ -438,7 +438,10 @@ mod tests {
         v
     }
 
-    fn collect() -> (Arc<StdMutex<Vec<PipelineEvent>>>, Arc<dyn Fn(PipelineEvent) + Send + Sync>) {
+    type Events = Arc<StdMutex<Vec<PipelineEvent>>>;
+    type Callback = Arc<dyn Fn(PipelineEvent) + Send + Sync>;
+
+    fn collect() -> (Events, Callback) {
         let ev = Arc::new(StdMutex::new(Vec::new()));
         let e2 = ev.clone();
         (ev, Arc::new(move |e| e2.lock().unwrap().push(e)))
@@ -447,7 +450,13 @@ mod tests {
     #[test]
     fn waits_for_keyframe_and_requests_one() {
         let (ev, cb) = collect();
-        let p = VideoPipeline::start(PipelineConfig { hardware: false, vp9_hardware: false }, cb);
+        let p = VideoPipeline::start(
+            PipelineConfig {
+                hardware: false,
+                vp9_hardware: false,
+            },
+            cb,
+        );
         p.push(vf(Codec::Vp9, false));
         std::thread::sleep(Duration::from_millis(100));
         let evs = ev.lock().unwrap().clone();
@@ -457,13 +466,23 @@ mod tests {
     #[test]
     fn hevc_without_hardware_reports_codec_failure() {
         let (ev, cb) = collect();
-        let p = VideoPipeline::start(PipelineConfig { hardware: true, vp9_hardware: true }, cb);
+        let p = VideoPipeline::start(
+            PipelineConfig {
+                hardware: true,
+                vp9_hardware: true,
+            },
+            cb,
+        );
         p.set_stream_size(1920, 1080);
         p.push(vf(Codec::H265, true));
         std::thread::sleep(Duration::from_millis(200));
         let evs = ev.lock().unwrap().clone();
-        assert!(evs
-            .iter()
-            .any(|e| matches!(e, PipelineEvent::CodecFailed { codec: Codec::H265, .. })));
+        assert!(evs.iter().any(|e| matches!(
+            e,
+            PipelineEvent::CodecFailed {
+                codec: Codec::H265,
+                ..
+            }
+        )));
     }
 }

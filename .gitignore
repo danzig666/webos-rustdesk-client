@@ -5,3 +5,4 @@
 *.ipk
 /device.local.*
 .env
+/sbom.cdx.json

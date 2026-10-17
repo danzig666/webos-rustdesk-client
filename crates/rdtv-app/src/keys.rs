@@ -30,19 +30,6 @@ pub enum Remote {
     ChDown,
 }
 
-impl Remote {
-    pub fn label(self) -> &'static str {
-        match self {
-            Remote::Red => "Red",
-            Remote::Green => "Green",
-            Remote::Yellow => "Yellow",
-            Remote::Blue => "Blue",
-            Remote::Back => "Back",
-            _ => "",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PtrButton {
     Left,
@@ -76,7 +63,11 @@ impl KeyMods {
 #[derive(Debug, Clone, PartialEq)]
 pub enum In {
     /// TV remote buttons (and arrows/Enter, which a remote and a keyboard share).
-    Remote { key: Remote, down: bool, repeat: bool },
+    Remote {
+        key: Remote,
+        down: bool,
+        repeat: bool,
+    },
     /// A physical keyboard key that is not a shared navigation key.
     Key {
         key: Keycode,
@@ -86,9 +77,20 @@ pub enum In {
         repeat: bool,
     },
     Text(String),
-    PointerMove { x: i32, y: i32 },
-    PointerButton { button: PtrButton, down: bool, x: i32, y: i32 },
-    Wheel { dx: i32, dy: i32 },
+    PointerMove {
+        x: i32,
+        y: i32,
+    },
+    PointerButton {
+        button: PtrButton,
+        down: bool,
+        x: i32,
+        y: i32,
+    },
+    Wheel {
+        dx: i32,
+        dy: i32,
+    },
     Focus(bool),
     Quit,
 }
@@ -153,8 +155,20 @@ pub fn poll(out: &mut Vec<In>) {
 fn translate(ev: Event, out: &mut Vec<In>) {
     match ev {
         Event::Quit { .. } => out.push(In::Quit),
-        Event::KeyDown { keycode, scancode, keymod, repeat, .. }
-        | Event::KeyUp { keycode, scancode, keymod, repeat, .. } => {
+        Event::KeyDown {
+            keycode,
+            scancode,
+            keymod,
+            repeat,
+            ..
+        }
+        | Event::KeyUp {
+            keycode,
+            scancode,
+            keymod,
+            repeat,
+            ..
+        } => {
             let down = matches!(ev, Event::KeyDown { .. });
             let Some(key) = keycode else { return };
             let shared = match key {
@@ -176,10 +190,22 @@ fn translate(ev: Event, out: &mut Vec<In>) {
             let mods = KeyMods::from_sdl(keymod);
             match shared {
                 // Arrows/Enter with modifiers are keyboard shortcuts, not remote navigation.
-                Some(r) if !(mods.ctrl || mods.alt || mods.gui || mods.shift) || !matches!(r, Remote::Up | Remote::Down | Remote::Left | Remote::Right | Remote::Ok) => {
+                Some(r)
+                    if !(mods.ctrl || mods.alt || mods.gui || mods.shift)
+                        || !matches!(
+                            r,
+                            Remote::Up | Remote::Down | Remote::Left | Remote::Right | Remote::Ok
+                        ) =>
+                {
                     out.push(In::Remote { key: r, down, repeat })
                 }
-                _ => out.push(In::Key { key, scancode, mods, down, repeat }),
+                _ => out.push(In::Key {
+                    key,
+                    scancode,
+                    mods,
+                    down,
+                    repeat,
+                }),
             }
         }
         Event::TextInput { text, .. } => out.push(In::Text(text)),
@@ -196,11 +222,17 @@ fn translate(ev: Event, out: &mut Vec<In>) {
         }
         Event::MouseWheel { x, y, .. } => out.push(In::Wheel { dx: x, dy: y }),
         Event::Window { win_event, .. } => match win_event {
-            sdl2::event::WindowEvent::FocusGained | sdl2::event::WindowEvent::Shown => out.push(In::Focus(true)),
-            sdl2::event::WindowEvent::FocusLost | sdl2::event::WindowEvent::Hidden => out.push(In::Focus(false)),
+            sdl2::event::WindowEvent::FocusGained | sdl2::event::WindowEvent::Shown => {
+                out.push(In::Focus(true))
+            }
+            sdl2::event::WindowEvent::FocusLost | sdl2::event::WindowEvent::Hidden => {
+                out.push(In::Focus(false))
+            }
             _ => {}
         },
-        Event::AppWillEnterBackground { .. } | Event::AppDidEnterBackground { .. } => out.push(In::Focus(false)),
+        Event::AppWillEnterBackground { .. } | Event::AppDidEnterBackground { .. } => {
+            out.push(In::Focus(false))
+        }
         Event::AppDidEnterForeground { .. } => out.push(In::Focus(true)),
         _ => {}
     }
@@ -286,9 +318,18 @@ mod tests {
 
     #[test]
     fn hotkey_letters_are_sent_as_chars() {
-        let m = KeyMods { ctrl: true, ..Default::default() };
-        assert!(matches!(physical_to_remote(Keycode::C, &m), Some(RemoteKey::Char('c'))));
+        let m = KeyMods {
+            ctrl: true,
+            ..Default::default()
+        };
+        assert!(matches!(
+            physical_to_remote(Keycode::C, &m),
+            Some(RemoteKey::Char('c'))
+        ));
         assert!(physical_to_remote(Keycode::C, &KeyMods::default()).is_none());
-        assert!(matches!(physical_to_remote(Keycode::F5, &KeyMods::default()), Some(RemoteKey::Control(_))));
+        assert!(matches!(
+            physical_to_remote(Keycode::F5, &KeyMods::default()),
+            Some(RemoteKey::Control(_))
+        ));
     }
 }

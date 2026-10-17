@@ -3,7 +3,7 @@
 use crate::{
     audio_out::AudioOut,
     gfx::Gfx,
-    keys::{In, KeyMods, Remote},
+    keys::{In, Remote},
     osk::{Mode as OskMode, Osk, OskAction},
     session_view::ActiveSession,
     ui::{Frame, Nav, UiIn, UiState},
@@ -72,13 +72,39 @@ pub enum ConfirmAction {
 }
 
 pub enum Modal {
-    Password { wrong: bool, value: String, remember: bool },
-    TwoFactor { wrong: bool, value: String },
-    Connecting { phase: session::Phase, since: Instant },
-    Reconnecting { plan: ReconnectPlan, next_at: Instant, attempt_running: bool, reason: String },
-    Failed { title: String, text: String, kind: FailureKind, retry: bool },
-    Confirm { text: String, action: ConfirmAction },
-    Notice { title: String, text: String },
+    Password {
+        wrong: bool,
+        value: String,
+        remember: bool,
+    },
+    TwoFactor {
+        wrong: bool,
+        value: String,
+    },
+    Connecting {
+        phase: session::Phase,
+        since: Instant,
+    },
+    Reconnecting {
+        plan: ReconnectPlan,
+        next_at: Instant,
+        attempt_running: bool,
+        reason: String,
+    },
+    Failed {
+        title: String,
+        text: String,
+        kind: FailureKind,
+        retry: bool,
+    },
+    Confirm {
+        text: String,
+        action: ConfirmAction,
+    },
+    Notice {
+        title: String,
+        text: String,
+    },
     /// After the app returned from the background where the default policy disconnected.
     ReconnectPrompt,
     PeerMenu(String),
@@ -139,7 +165,11 @@ impl App {
             platform.webos_release,
             platform.ndl_error.as_deref().unwrap_or("available")
         );
-        let screen = if store.state.settings.first_run_done { Screen::Home } else { Screen::FirstRun };
+        let screen = if store.state.settings.first_run_done {
+            Screen::Home
+        } else {
+            Screen::FirstRun
+        };
         let mut ui = UiState::default();
         if screen == Screen::Home {
             ui.want_focus = Some(crate::ui::id("home-target"));
@@ -267,9 +297,18 @@ impl App {
         let peer_id = target.as_str().to_owned();
         let rec = self.store.peer(&profile.id, &peer_id);
         let mut remembered = self.store.remembered_password(&profile.id, &peer_id);
-        if remembered.is_none() && self.last_session.as_ref().is_some_and(|(p, t)| *p == profile.id && *t == target) {
+        if remembered.is_none()
+            && self
+                .last_session
+                .as_ref()
+                .is_some_and(|(p, t)| *p == profile.id && *t == target)
+        {
             remembered = self.last_session_hash.clone();
-        } else if self.last_session.as_ref().is_none_or(|(p, t)| *p != profile.id || *t != target) {
+        } else if self
+            .last_session
+            .as_ref()
+            .is_none_or(|(p, t)| *p != profile.id || *t != target)
+        {
             self.last_session_hash = None;
         }
         let caps = caps::decode_caps(&self.platform, self.hw_policy(), &self.failed_codecs);
@@ -315,7 +354,10 @@ impl App {
             log::info!("ending session {} ({why})", a.handle.generation);
             a.stop(lock);
         }
-        if matches!(self.modal, Some(Modal::Reconnecting { .. }) | Some(Modal::Connecting { .. })) {
+        if matches!(
+            self.modal,
+            Some(Modal::Reconnecting { .. }) | Some(Modal::Connecting { .. })
+        ) {
             self.modal = None;
         }
         if self.screen == Screen::Session {
@@ -324,20 +366,35 @@ impl App {
     }
 
     fn start_reconnect_attempt(&mut self) {
-        let Some((pid, target)) = self.last_session.clone() else { return };
+        let Some((pid, target)) = self.last_session.clone() else {
+            return;
+        };
         if self.store.state.active_profile != pid {
             return;
         }
         // Reuse connect() but keep the reconnect modal.
         let plan_modal = self.modal.take();
         self.connect(target, None);
-        if let Some(Modal::Reconnecting { plan, next_at, reason, .. }) = plan_modal {
-            self.modal = Some(Modal::Reconnecting { plan, next_at, attempt_running: true, reason });
+        if let Some(Modal::Reconnecting {
+            plan,
+            next_at,
+            reason,
+            ..
+        }) = plan_modal
+        {
+            self.modal = Some(Modal::Reconnecting {
+                plan,
+                next_at,
+                attempt_running: true,
+                reason,
+            });
         }
     }
 
     fn handle_session_event(&mut self, gen: u64, ev: SessionEvent) {
-        let Some(active) = self.active.as_mut() else { return };
+        let Some(active) = self.active.as_mut() else {
+            return;
+        };
         if active.handle.generation != gen {
             return; // stale session
         }
@@ -350,11 +407,18 @@ impl App {
                 }
             }
             SessionEvent::PasswordRequired { wrong } => {
-                self.modal = Some(Modal::Password { wrong, value: String::new(), remember: false });
+                self.modal = Some(Modal::Password {
+                    wrong,
+                    value: String::new(),
+                    remember: false,
+                });
                 self.ui.want_focus = Some(crate::ui::id("pw-field"));
             }
             SessionEvent::TwoFactorRequired { wrong } => {
-                self.modal = Some(Modal::TwoFactor { wrong, value: String::new() });
+                self.modal = Some(Modal::TwoFactor {
+                    wrong,
+                    value: String::new(),
+                });
             }
             SessionEvent::RememberHash(h) => {
                 self.store.remember_password(&pid, &peer_id, &h);
@@ -364,17 +428,28 @@ impl App {
                 self.store.forget_password(&pid, &peer_id);
                 self.store.save();
             }
-            SessionEvent::Connected { peer, route, secured, session_hash } => {
+            SessionEvent::Connected {
+                peer,
+                route,
+                secured,
+                session_hash,
+            } => {
                 self.last_session_hash = session_hash;
                 active.on_connected(peer.clone(), route, secured);
-                self.store.note_connected(&pid, &peer_id, &peer.hostname, &peer.platform);
+                self.store
+                    .note_connected(&pid, &peer_id, &peer.hostname, &peer.platform);
                 self.store.save();
                 self.modal = None;
                 self.go(Screen::Session);
             }
             SessionEvent::Ended(end) => {
                 let was_reconnecting = matches!(self.modal, Some(Modal::Reconnecting { .. }));
-                log::info!("session {gen} ended: {} ({:?}, intentional={})", end.message, end.kind, end.intentional);
+                log::info!(
+                    "session {gen} ended: {} ({:?}, intentional={})",
+                    end.message,
+                    end.kind,
+                    end.intentional
+                );
                 if let Some(a) = self.active.take() {
                     a.stop(false);
                 }
@@ -408,7 +483,10 @@ impl App {
                     title: end.kind.title().to_owned(),
                     text: friendly_error(&end.message, end.kind),
                     kind: end.kind,
-                    retry: !matches!(end.kind, FailureKind::Auth | FailureKind::Key | FailureKind::IdNotFound),
+                    retry: !matches!(
+                        end.kind,
+                        FailureKind::Auth | FailureKind::Key | FailureKind::IdNotFound
+                    ),
                 });
             }
             other => active.on_event(other, &mut self.store),
@@ -417,7 +495,9 @@ impl App {
 
     fn handle_pipeline_event(&mut self, gen: u64, ev: PipelineEvent) {
         let policy = self.hw_policy();
-        let Some(active) = self.active.as_mut() else { return };
+        let Some(active) = self.active.as_mut() else {
+            return;
+        };
         if active.handle.generation != gen {
             return;
         }
@@ -429,8 +509,16 @@ impl App {
                     }
                 }
                 let caps = caps::decode_caps(&self.platform, policy, &self.failed_codecs);
-                active.on_codec_failed(codec, &reason, caps, caps::vp9_in_hardware(&self.platform, policy, &self.failed_codecs));
-                self.toast(format!("{} decoding unavailable ({reason}); switching codec", codec.name()));
+                active.on_codec_failed(
+                    codec,
+                    &reason,
+                    caps,
+                    caps::vp9_in_hardware(&self.platform, policy, &self.failed_codecs),
+                );
+                self.toast(format!(
+                    "{} decoding unavailable ({reason}); switching codec",
+                    codec.name()
+                ));
             }
             other => active.on_pipeline_event(other),
         }
@@ -456,7 +544,12 @@ impl App {
                         a.enter_background();
                     }
                 } else {
-                    self.end_session(self.active.as_ref().is_some_and(|a| a.settings.lock_on_disconnect), "app left the foreground");
+                    self.end_session(
+                        self.active
+                            .as_ref()
+                            .is_some_and(|a| a.settings.lock_on_disconnect),
+                        "app left the foreground",
+                    );
                     self.modal = Some(Modal::ReconnectPrompt);
                 }
                 self.focus_lost_at = None;
@@ -470,7 +563,11 @@ impl App {
         if let Some(a) = self.active.as_mut() {
             a.tick();
         }
-        if self.toast.as_ref().is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(5)) {
+        if self
+            .toast
+            .as_ref()
+            .is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(5))
+        {
             self.toast = None;
         }
     }
@@ -531,9 +628,19 @@ impl App {
                 _ => {}
             },
             In::PointerMove { x, y } => self.ui.push(UiIn::PointerMove(x, y)),
-            In::PointerButton { button: crate::keys::PtrButton::Left, down: false, x, y } => self.ui.push(UiIn::Click(x, y)),
+            In::PointerButton {
+                button: crate::keys::PtrButton::Left,
+                down: false,
+                x,
+                y,
+            } => self.ui.push(UiIn::Click(x, y)),
             In::Wheel { dy, .. } => self.ui.push(UiIn::Wheel(dy)),
-            In::Key { key, down: true, mods, .. } => {
+            In::Key {
+                key,
+                down: true,
+                mods,
+                ..
+            } => {
                 use sdl2::keyboard::Keycode;
                 match key {
                     Keycode::Escape | Keycode::AcBack => self.back(),
@@ -548,10 +655,19 @@ impl App {
 
     fn editor_input(&mut self, i: In) {
         match i {
-            In::Remote { key: Remote::Back, down: true, .. } => {
+            In::Remote {
+                key: Remote::Back,
+                down: true,
+                ..
+            } => {
                 self.editor = None;
             }
-            In::Key { key, down: true, mods, .. } => {
+            In::Key {
+                key,
+                down: true,
+                mods,
+                ..
+            } => {
                 use sdl2::keyboard::Keycode;
                 let Some(ed) = self.editor.as_mut() else { return };
                 match key {
@@ -569,7 +685,11 @@ impl App {
                     }
                 }
             }
-            In::Remote { key: Remote::Ok, down: true, .. } if false => {}
+            In::Remote {
+                key: Remote::Ok,
+                down: true,
+                ..
+            } if false => {}
             other => self.nav_input(other),
         }
     }
@@ -613,8 +733,14 @@ impl App {
     pub fn submit_password(&mut self) {
         if let Some(Modal::Password { value, remember, .. }) = self.modal.take() {
             if let Some(a) = self.active.as_ref() {
-                a.handle.send(session::SessionCommand::Password { password: value, remember });
-                self.modal = Some(Modal::Connecting { phase: session::Phase::LoggingIn, since: Instant::now() });
+                a.handle.send(session::SessionCommand::Password {
+                    password: value,
+                    remember,
+                });
+                self.modal = Some(Modal::Connecting {
+                    phase: session::Phase::LoggingIn,
+                    since: Instant::now(),
+                });
             }
         }
     }
@@ -623,7 +749,10 @@ impl App {
         if let Some(Modal::TwoFactor { value, .. }) = self.modal.take() {
             if let Some(a) = self.active.as_ref() {
                 a.handle.send(session::SessionCommand::TwoFactor { code: value });
-                self.modal = Some(Modal::Connecting { phase: session::Phase::LoggingIn, since: Instant::now() });
+                self.modal = Some(Modal::Connecting {
+                    phase: session::Phase::LoggingIn,
+                    since: Instant::now(),
+                });
             }
         }
     }
@@ -648,7 +777,10 @@ impl App {
         }
         match self.screen {
             Screen::Home => {
-                self.modal = Some(Modal::Confirm { text: "Exit RemoteDesk TV?".into(), action: ConfirmAction::Quit });
+                self.modal = Some(Modal::Confirm {
+                    text: "Exit RemoteDesk TV?".into(),
+                    action: ConfirmAction::Quit,
+                });
             }
             Screen::Session => {
                 if let Some(a) = self.active.as_mut() {
@@ -656,7 +788,9 @@ impl App {
                 }
             }
             Screen::ProfileEdit(..) => self.go(Screen::Profiles),
-            Screen::Profiles | Screen::Diagnostics | Screen::About | Screen::Help => self.go(Screen::Settings),
+            Screen::Profiles | Screen::Diagnostics | Screen::About | Screen::Help => {
+                self.go(Screen::Settings)
+            }
             Screen::PeerSettings(_) | Screen::Settings => {
                 if self.active.as_ref().is_some_and(|a| a.connected) {
                     self.go(Screen::Session)
@@ -749,21 +883,22 @@ impl App {
 
 pub fn friendly_error(msg: &str, kind: FailureKind) -> String {
     match kind {
-        FailureKind::IdNotFound => "The server does not know this ID. Check the ID and that the right server profile is selected.".into(),
+        FailureKind::IdNotFound => {
+            "The server does not know this ID. Check the ID and that the right server profile is selected."
+                .into()
+        }
         FailureKind::PeerOffline => "The remote computer is offline or not connected to this server.".into(),
-        FailureKind::Key => format!("The server rejected the key ({msg}). Check the key in the server profile."),
+        FailureKind::Key => {
+            format!("The server rejected the key ({msg}). Check the key in the server profile.")
+        }
         FailureKind::Auth => format!("{msg}. Check the password."),
-        FailureKind::Server => format!("Could not reach the server: {msg}. Check the network and the ID server address."),
+        FailureKind::Server => {
+            format!("Could not reach the server: {msg}. Check the network and the ID server address.")
+        }
         FailureKind::ConnectionLost => format!("The connection was lost: {msg}."),
         FailureKind::Codec => format!("The video stream could not be decoded: {msg}."),
         FailureKind::Platform => format!("A TV playback component failed: {msg}."),
         FailureKind::Refused => format!("The remote computer refused: {msg}."),
         FailureKind::Other => msg.to_owned(),
-    }
-}
-
-impl App {
-    pub fn mods_dummy() -> KeyMods {
-        KeyMods::default()
     }
 }

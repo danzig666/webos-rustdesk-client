@@ -83,7 +83,10 @@ async fn request_inner(
         req.push_str(&format!("Authorization: Bearer {t}\r\n"));
     }
     if json_body.is_some() || method == "POST" {
-        req.push_str(&format!("Content-Type: application/json\r\nContent-Length: {}\r\n", body.len()));
+        req.push_str(&format!(
+            "Content-Type: application/json\r\nContent-Length: {}\r\n",
+            body.len()
+        ));
     }
     req.push_str("\r\n");
     io.write_all(req.as_bytes()).await?;
@@ -138,7 +141,11 @@ fn dechunk(mut b: &[u8]) -> ResultType<Vec<u8>> {
     let mut out = Vec::new();
     loop {
         let eol = b.windows(2).position(|w| w == b"\r\n").context("bad chunk")?;
-        let size_s = std::str::from_utf8(&b[..eol])?.split(';').next().unwrap_or("").trim();
+        let size_s = std::str::from_utf8(&b[..eol])?
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .trim();
         let size = usize::from_str_radix(size_s, 16).context("bad chunk size")?;
         b = &b[eol + 2..];
         if size == 0 {
@@ -163,7 +170,10 @@ mod tests {
     fn parses_plain_and_chunked() {
         let r = parse_response(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}").unwrap();
         assert_eq!((r.status, r.body.as_str()), (200, "{}"));
-        let r = parse_response(b"HTTP/1.1 401 X\r\nTransfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n").unwrap();
+        let r = parse_response(
+            b"HTTP/1.1 401 X\r\nTransfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n",
+        )
+        .unwrap();
         assert_eq!((r.status, r.body.as_str()), (401, "abcde"));
         assert!(parse_response(b"garbage").is_err());
     }

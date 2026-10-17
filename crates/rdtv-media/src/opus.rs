@@ -30,8 +30,7 @@ unsafe impl Send for OpusDecoder {}
 
 impl OpusDecoder {
     pub fn new(sample_rate: u32, channels: u32) -> Result<Self> {
-        if ![8000, 12000, 16000, 24000, 48000].contains(&sample_rate) || !(1..=2).contains(&channels)
-        {
+        if ![8000, 12000, 16000, 24000, 48000].contains(&sample_rate) || !(1..=2).contains(&channels) {
             bail!("unsupported audio format {sample_rate} Hz x{channels}");
         }
         let mut err = 0;

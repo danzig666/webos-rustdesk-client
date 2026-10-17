@@ -136,7 +136,7 @@ impl ServerProfile {
         }
         let reversed: String = s.chars().rev().collect();
         let mut padded = reversed.clone();
-        while padded.len() % 4 != 0 {
+        while !padded.len().is_multiple_of(4) {
             padded.push('=');
         }
         let bytes = STANDARD.decode(padded.as_bytes()).ok()?;

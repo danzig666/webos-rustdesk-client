@@ -17,9 +17,11 @@ use crate::{
     view::{self, Monitor, RectF, ViewState},
 };
 use rdtv_core::{
-    input::{self, HeldInput, MouseButton, Mods},
+    input::{self, HeldInput, Mods, MouseButton},
     message_proto::{AudioFormat, AudioFrame, ControlKey, VideoFrame},
-    session::{self, DecodeCaps, DisplayDesc, MediaSink, PeerSummary, SessionCommand, SessionEvent, SessionHandle},
+    session::{
+        self, DecodeCaps, DisplayDesc, MediaSink, PeerSummary, SessionCommand, SessionEvent, SessionHandle,
+    },
     store::{default_shortcuts, DpadMode, OskPresentation, PeerSettings, Quality, Store, ViewMode},
     transport::Route,
 };
@@ -137,45 +139,96 @@ pub fn keycode_char(key: Keycode, mods: &KeyMods) -> Option<char> {
         // Non-ASCII keycodes (e.g. a Hungarian keyboard's á) are the character itself.
         if n > 0xff && (n & (1 << 30)) == 0 {
             if let Some(c) = char::from_u32(n as u32) {
-                return Some(if mods.shift ^ mods.caps { c.to_uppercase().next().unwrap_or(c) } else { c });
+                return Some(if mods.shift ^ mods.caps {
+                    c.to_uppercase().next().unwrap_or(c)
+                } else {
+                    c
+                });
             }
         }
         return None;
     }
     let c = n as u8 as char;
     if !mods.shift {
-        return Some(if mods.caps && c.is_ascii_alphabetic() { c.to_ascii_uppercase() } else { c });
+        return Some(if mods.caps && c.is_ascii_alphabetic() {
+            c.to_ascii_uppercase()
+        } else {
+            c
+        });
     }
     Some(match c {
-        'a'..='z' => if mods.caps { c } else { c.to_ascii_uppercase() },
-        '1' => '!', '2' => '@', '3' => '#', '4' => '$', '5' => '%', '6' => '^', '7' => '&', '8' => '*', '9' => '(', '0' => ')',
-        '-' => '_', '=' => '+', '[' => '{', ']' => '}', '\\' => '|', ';' => ':', '\'' => '"', ',' => '<', '.' => '>', '/' => '?', '`' => '~',
+        'a'..='z' => {
+            if mods.caps {
+                c
+            } else {
+                c.to_ascii_uppercase()
+            }
+        }
+        '1' => '!',
+        '2' => '@',
+        '3' => '#',
+        '4' => '$',
+        '5' => '%',
+        '6' => '^',
+        '7' => '&',
+        '8' => '*',
+        '9' => '(',
+        '0' => ')',
+        '-' => '_',
+        '=' => '+',
+        '[' => '{',
+        ']' => '}',
+        '\\' => '|',
+        ';' => ':',
+        '\'' => '"',
+        ',' => '<',
+        '.' => '>',
+        '/' => '?',
+        '`' => '~',
         other => other,
     })
 }
 
 impl ActiveSession {
-    pub fn start(app: &mut App, req: session::SessionRequest, ring: Arc<AudioRing>, settings: PeerSettings) -> ActiveSession {
+    pub fn start(
+        app: &mut App,
+        req: session::SessionRequest,
+        ring: Arc<AudioRing>,
+        settings: PeerSettings,
+    ) -> ActiveSession {
         let gen_cell = Arc::new(AtomicU64::new(0));
         let tx = app.tx.clone();
         let g2 = gen_cell.clone();
         let pipe = Arc::new(VideoPipeline::start(
             PipelineConfig {
                 hardware: app.platform.ndl_available && app.store.state.settings.prefer_hardware_decoding,
-                vp9_hardware: rdtv_media::caps::vp9_in_hardware(&app.platform, app.hw_policy(), &app.failed_codecs),
+                vp9_hardware: rdtv_media::caps::vp9_in_hardware(
+                    &app.platform,
+                    app.hw_policy(),
+                    &app.failed_codecs,
+                ),
             },
             Arc::new(move |e| {
                 let _ = tx.send(AppMsg::Pipeline(g2.load(Ordering::SeqCst), e));
             }),
         ));
         let paused = Arc::new(AtomicBool::new(false));
-        let sink = Arc::new(Sink { pipe: pipe.clone(), ring: ring.clone(), paused: paused.clone() });
+        let sink = Arc::new(Sink {
+            pipe: pipe.clone(),
+            ring: ring.clone(),
+            paused: paused.clone(),
+        });
         let tx = app.tx.clone();
         let profile_id = req.profile.id.clone();
         let peer_id = req.target.as_str().to_owned();
-        let handle = session::start(app.rt.handle(), req, sink, Arc::new(move |g, e| {
-            let _ = tx.send(AppMsg::Session(g, e));
-        }));
+        let handle = session::start(
+            app.rt.handle(),
+            req,
+            sink,
+            Arc::new(move |g, e| {
+                let _ = tx.send(AppMsg::Session(g, e));
+            }),
+        );
         gen_cell.store(handle.generation, Ordering::SeqCst);
         let view = ViewState {
             mode: settings.view,
@@ -237,7 +290,9 @@ impl ActiveSession {
                 s.handle.send(SessionCommand::SendMany(rel));
             }
         }
-        s.handle.send(SessionCommand::Disconnect { lock: lock && s.connected });
+        s.handle.send(SessionCommand::Disconnect {
+            lock: lock && s.connected,
+        });
         s.pipe.reset();
         s.ring.clear();
     }
@@ -247,19 +302,43 @@ impl ActiveSession {
     }
 
     fn monitor(&self) -> Option<Monitor> {
-        self.current.as_ref().map(|d| Monitor { x: d.x, y: d.y, w: d.width.max(1), h: d.height.max(1) })
+        self.current.as_ref().map(|d| Monitor {
+            x: d.x,
+            y: d.y,
+            w: d.width.max(1),
+            h: d.height.max(1),
+        })
     }
 
     pub fn on_connected(&mut self, peer: PeerSummary, route: Route, secured: bool) {
         self.connected = true;
         self.displays = peer.displays.clone();
-        let idx = if (peer.current_display as usize) < self.displays.len() { peer.current_display as usize } else { 0 };
+        let idx = if (peer.current_display as usize) < self.displays.len() {
+            peer.current_display as usize
+        } else {
+            0
+        };
         let want = self.settings.monitor;
-        let pick = if want >= 0 && (want as usize) < self.displays.len() { want as usize } else { idx };
+        let pick = if want >= 0 && (want as usize) < self.displays.len() {
+            want as usize
+        } else {
+            idx
+        };
         if want as usize >= self.displays.len() && !self.settings.monitor_name.is_empty() {
-            self.notice = Some((format!("Saved monitor \"{}\" is not available; showing monitor {}", self.settings.monitor_name, idx + 1), Instant::now()));
+            self.notice = Some((
+                format!(
+                    "Saved monitor \"{}\" is not available; showing monitor {}",
+                    self.settings.monitor_name,
+                    idx + 1
+                ),
+                Instant::now(),
+            ));
         }
-        self.current = self.displays.get(pick).cloned().or_else(|| self.displays.first().cloned());
+        self.current = self
+            .displays
+            .get(pick)
+            .cloned()
+            .or_else(|| self.displays.first().cloned());
         if let Some(d) = &self.current {
             self.pipe.set_stream_size(d.width, d.height);
             self.vmouse = (d.x + d.width / 2, d.y + d.height / 2);
@@ -280,7 +359,10 @@ impl ActiveSession {
                 self.displays = d;
                 if let Some(cur) = &self.current {
                     if !self.displays.iter().any(|x| x.index == cur.index) {
-                        self.notice = Some(("The selected monitor disappeared; switched to the first monitor".into(), Instant::now()));
+                        self.notice = Some((
+                            "The selected monitor disappeared; switched to the first monitor".into(),
+                            Instant::now(),
+                        ));
                         self.switch_monitor(0, store);
                     }
                 }
@@ -291,8 +373,20 @@ impl ActiveSession {
                 }
                 self.pipe.reset();
                 self.video_tex = None;
-                let name = if d.name.is_empty() { format!("Monitor {}", d.index + 1) } else { d.name.clone() };
-                self.banner = Some((format!("Monitor {} of {} · {}", d.index + 1, self.displays.len().max(1), name), Instant::now()));
+                let name = if d.name.is_empty() {
+                    format!("Monitor {}", d.index + 1)
+                } else {
+                    d.name.clone()
+                };
+                self.banner = Some((
+                    format!(
+                        "Monitor {} of {} · {}",
+                        d.index + 1,
+                        self.displays.len().max(1),
+                        name
+                    ),
+                    Instant::now(),
+                ));
                 self.current = Some(d);
                 if let Some(m) = self.monitor() {
                     self.vmouse = view::clamp_host(m, self.vmouse.0, self.vmouse.1);
@@ -308,7 +402,14 @@ impl ActiveSession {
             SessionEvent::CursorId(i) => self.cursor_id = i,
             SessionEvent::CursorPosition { x, y } => self.remote_cursor = Some((x, y)),
             SessionEvent::Permission { name, enabled } => {
-                self.notice = Some((format!("Host {} permission: {}", name, if enabled { "allowed" } else { "denied" }), Instant::now()));
+                self.notice = Some((
+                    format!(
+                        "Host {} permission: {}",
+                        name,
+                        if enabled { "allowed" } else { "denied" }
+                    ),
+                    Instant::now(),
+                ));
             }
             SessionEvent::Notice { title, text } => {
                 self.notice = Some((format!("{title}: {text}"), Instant::now()));
@@ -320,8 +421,19 @@ impl ActiveSession {
 
     pub fn on_pipeline_event(&mut self, ev: PipelineEvent) {
         match ev {
-            PipelineEvent::Presenting { codec, hardware, width, height } => {
-                log::info!("presenting {} {}x{} ({})", codec.name(), width, height, if hardware { "hardware" } else { "software" });
+            PipelineEvent::Presenting {
+                codec,
+                hardware,
+                width,
+                height,
+            } => {
+                log::info!(
+                    "presenting {} {}x{} ({})",
+                    codec.name(),
+                    width,
+                    height,
+                    if hardware { "hardware" } else { "software" }
+                );
                 self.presenting = Some((codec, hardware, width, height));
                 if hardware {
                     self.video_tex = None;
@@ -335,8 +447,15 @@ impl ActiveSession {
     }
 
     pub fn on_codec_failed(&mut self, codec: Codec, reason: &str, caps: DecodeCaps, vp9_hw: bool) {
-        log::warn!("codec {} failed: {reason}; re-advertising {:?}", codec.name(), caps);
-        self.pipe.set_config(PipelineConfig { hardware: caps.h264 || caps.h265 || caps.av1 || vp9_hw, vp9_hardware: vp9_hw });
+        log::warn!(
+            "codec {} failed: {reason}; re-advertising {:?}",
+            codec.name(),
+            caps
+        );
+        self.pipe.set_config(PipelineConfig {
+            hardware: caps.h264 || caps.h265 || caps.av1 || vp9_hw,
+            vp9_hardware: vp9_hw,
+        });
         self.handle.send(SessionCommand::UpdateDecoding(caps));
         if let Some(d) = &self.current {
             self.handle.send(SessionCommand::RefreshVideo(d.index));
@@ -409,8 +528,20 @@ impl ActiveSession {
             self.settings.monitor = d.index;
             self.settings.monitor_name = d.name.clone();
             self.save_settings(store);
-            let name = if d.name.is_empty() { format!("Monitor {}", d.index + 1) } else { d.name.clone() };
-            self.banner = Some((format!("Switching to monitor {} of {} · {}", d.index + 1, self.displays.len(), name), Instant::now()));
+            let name = if d.name.is_empty() {
+                format!("Monitor {}", d.index + 1)
+            } else {
+                d.name.clone()
+            };
+            self.banner = Some((
+                format!(
+                    "Switching to monitor {} of {} · {}",
+                    d.index + 1,
+                    self.displays.len(),
+                    name
+                ),
+                Instant::now(),
+            ));
         }
     }
 
@@ -435,16 +566,29 @@ impl ActiveSession {
         if let Some((_, _, w, h)) = self.presenting {
             return (w as f32, h as f32);
         }
-        self.current.as_ref().map(|d| (d.width as f32, d.height as f32)).unwrap_or((1920.0, 1080.0))
+        self.current
+            .as_ref()
+            .map(|d| (d.width as f32, d.height as f32))
+            .unwrap_or((1920.0, 1080.0))
     }
 
     /// The area the picture may use and `V` within it.
     pub fn view_rect(&self) -> RectF {
         let osk_h = self.osk.as_ref().map(|o| o.height()).unwrap_or(0);
-        let shrink = self.osk.is_some() && self.settings.osk_presentation == OskPresentation::Shrink && !self.hardware();
-        let area = if shrink { RectF::new(0.0, 0.0, W as f32, (H - osk_h) as f32) } else { RectF::new(0.0, 0.0, W as f32, H as f32) };
+        let shrink = self.osk.is_some()
+            && self.settings.osk_presentation == OskPresentation::Shrink
+            && !self.hardware();
+        let area = if shrink {
+            RectF::new(0.0, 0.0, W as f32, (H - osk_h) as f32)
+        } else {
+            RectF::new(0.0, 0.0, W as f32, H as f32)
+        };
         let (sw, sh) = self.stream_size();
-        let st = if self.hardware() { ViewState::default() } else { self.view };
+        let st = if self.hardware() {
+            ViewState::default()
+        } else {
+            self.view
+        };
         view::view_rect(area, sw, sh, &st, self.px_per_logical)
     }
 
@@ -489,7 +633,10 @@ impl ActiveSession {
 
     fn open_keyboard(&mut self) {
         let mut o = Osk::new(OskMode::Remote, self.settings.keyboard_layout);
-        o.mac = self.peer.as_ref().is_some_and(|p| p.platform.eq_ignore_ascii_case("Mac OS"));
+        o.mac = self
+            .peer
+            .as_ref()
+            .is_some_and(|p| p.platform.eq_ignore_ascii_case("Mac OS"));
         o.shortcuts = self.settings.shortcuts.clone().unwrap_or_default();
         self.view_before_osk = Some(self.view);
         self.osk = Some(o);
@@ -510,11 +657,21 @@ impl ActiveSession {
     }
 
     pub fn tick(&mut self) {
-        if self.toolbar && self.menu == Menu::None && self.osk.is_none() && self.toolbar_activity.elapsed() > TOOLBAR_HIDE && self.connected {
+        if self.toolbar
+            && self.menu == Menu::None
+            && self.osk.is_none()
+            && self.toolbar_activity.elapsed() > TOOLBAR_HIDE
+            && self.connected
+        {
             self.toolbar = false;
         }
         // D-pad virtual mouse movement with acceleration.
-        if self.settings.dpad_mode == DpadMode::Mouse && self.osk.is_none() && self.menu == Menu::None && !self.toolbar && self.dpad.iter().any(|d| *d) {
+        if self.settings.dpad_mode == DpadMode::Mouse
+            && self.osk.is_none()
+            && self.menu == Menu::None
+            && !self.toolbar
+            && self.dpad.iter().any(|d| *d)
+        {
             let held_for = self.dpad_since.map(|t| t.elapsed().as_secs_f32()).unwrap_or(0.0);
             let speed_ui = (4.0 + held_for * 30.0).min(30.0);
             let v = self.view_rect();
@@ -523,7 +680,11 @@ impl ActiveSession {
                 let sy = m.h as f32 / v.h.max(1.0);
                 let dx = (self.dpad[3] as i32 - self.dpad[2] as i32) as f32 * speed_ui * sx;
                 let dy = (self.dpad[1] as i32 - self.dpad[0] as i32) as f32 * speed_ui * sy;
-                let (nx, ny) = view::clamp_host(m, self.vmouse.0 + dx.round() as i32, self.vmouse.1 + dy.round() as i32);
+                let (nx, ny) = view::clamp_host(
+                    m,
+                    self.vmouse.0 + dx.round() as i32,
+                    self.vmouse.1 + dy.round() as i32,
+                );
                 self.move_to(nx, ny);
                 if self.view.mode != ViewMode::Fit && !self.hardware() {
                     let area = RectF::new(0.0, 0.0, W as f32, H as f32);
@@ -549,7 +710,13 @@ impl ActiveSession {
             return false;
         }
         // Physical escape chord: Ctrl+Alt+Shift+Space opens local controls.
-        if let In::Key { key: Keycode::Space, mods, down: true, .. } = i {
+        if let In::Key {
+            key: Keycode::Space,
+            mods,
+            down: true,
+            ..
+        } = i
+        {
             if store.state.settings.escape_chord_enabled && mods.ctrl && mods.alt && mods.shift {
                 self.toolbar = true;
                 self.menu = Menu::None;
@@ -587,7 +754,11 @@ impl ActiveSession {
                 if local_overlay {
                     // Overlay owns D-pad/OK; colour shortcuts are blocked while a menu or
                     // the keyboard is open, but work over the bare toolbar.
-                    if self.toolbar && self.osk.is_none() && self.menu == Menu::None && matches!(key, Remote::Red | Remote::Green | Remote::Yellow) {
+                    if self.toolbar
+                        && self.osk.is_none()
+                        && self.menu == Menu::None
+                        && matches!(key, Remote::Red | Remote::Green | Remote::Yellow)
+                    {
                         self.toolbar = false;
                         return self.handle_input(i, ui, store);
                     }
@@ -732,14 +903,23 @@ impl ActiveSession {
                 true
             }
             In::Wheel { dx, dy } => {
-                if self.menu != Menu::None || (self.osk.is_some() && self.pointer_ui.1 >= H - self.osk.as_ref().map(|o| o.height()).unwrap_or(0)) {
+                if self.menu != Menu::None
+                    || (self.osk.is_some()
+                        && self.pointer_ui.1 >= H - self.osk.as_ref().map(|o| o.height()).unwrap_or(0))
+                {
                     ui.push(UiIn::Wheel(*dy));
                 } else {
                     self.send(input::mouse_wheel(*dx, *dy));
                 }
                 true
             }
-            In::Key { key, mods, down, repeat, .. } => {
+            In::Key {
+                key,
+                mods,
+                down,
+                repeat,
+                ..
+            } => {
                 self.keyboard_active_until = Some(Instant::now() + KEYBOARD_ACTIVE);
                 if self.menu != Menu::None {
                     return false;
@@ -753,7 +933,13 @@ impl ActiveSession {
     }
 
     fn physical_key(&mut self, key: Keycode, mods: &KeyMods, down: bool, repeat: bool) {
-        let m = Mods { ctrl: mods.ctrl, alt: mods.alt, shift: mods.shift, meta: mods.gui, altgr: false };
+        let m = Mods {
+            ctrl: mods.ctrl,
+            alt: mods.alt,
+            shift: mods.shift,
+            meta: mods.gui,
+            altgr: false,
+        };
         // Bare modifiers are not sent on their own (legacy mode attaches modifiers to each
         // key), except a lone Win/Command press, which opens the Start menu.
         match key {
@@ -766,7 +952,12 @@ impl ActiveSession {
                 }
                 return;
             }
-            Keycode::LCtrl | Keycode::RCtrl | Keycode::LShift | Keycode::RShift | Keycode::LAlt | Keycode::RAlt => return,
+            Keycode::LCtrl
+            | Keycode::RCtrl
+            | Keycode::LShift
+            | Keycode::RShift
+            | Keycode::LAlt
+            | Keycode::RAlt => return,
             _ => {}
         }
         if down {
@@ -789,11 +980,8 @@ impl ActiveSession {
                     self.send(input::control_key(ck, down, false, m));
                 }
             }
-            Some(RemoteKey::Char(c)) => {
-                if down {
-                    self.send(input::chr_key(c, true, true, m));
-                }
-            }
+            Some(RemoteKey::Char(c)) if down => self.send(input::chr_key(c, true, true, m)),
+            Some(RemoteKey::Char(_)) => {}
             None => {}
         }
     }
@@ -830,9 +1018,15 @@ impl ActiveSession {
         }
         let pic = self.pipe.mailbox.lock().ok().and_then(|mut m| m.take());
         let Some(pic) = pic else { return };
-        let needs_new = self.video_tex.as_ref().is_none_or(|(_, w, h)| *w != pic.width || *h != pic.height);
+        let needs_new = self
+            .video_tex
+            .as_ref()
+            .is_none_or(|(_, w, h)| *w != pic.width || *h != pic.height);
         if needs_new {
-            match g.texture_creator().create_texture_streaming(PixelFormatEnum::IYUV, pic.width, pic.height) {
+            match g
+                .texture_creator()
+                .create_texture_streaming(PixelFormatEnum::IYUV, pic.width, pic.height)
+            {
                 Ok(t) => self.video_tex = Some((t, pic.width, pic.height)),
                 Err(e) => {
                     log::error!("video texture: {e}");
@@ -841,22 +1035,42 @@ impl ActiveSession {
             }
         }
         if let Some((t, _, _)) = self.video_tex.as_mut() {
-            let _ = t.update_yuv(None, &pic.y, pic.y_stride, &pic.u, pic.uv_stride, &pic.v, pic.uv_stride);
+            let _ = t.update_yuv(
+                None,
+                &pic.y,
+                pic.y_stride,
+                &pic.u,
+                pic.uv_stride,
+                &pic.v,
+                pic.uv_stride,
+            );
         }
     }
 
     fn upload_cursor(&mut self, g: &mut Gfx) {
         if let Some(c) = self.pending_cursor.take() {
-            if let Ok(mut t) = g.texture_creator().create_texture_static(PixelFormatEnum::ABGR8888, c.width as u32, c.height as u32) {
+            if let Ok(mut t) = g.texture_creator().create_texture_static(
+                PixelFormatEnum::ABGR8888,
+                c.width as u32,
+                c.height as u32,
+            ) {
                 let _ = t.update(None, &c.rgba, (c.width * 4) as usize);
                 t.set_blend_mode(sdl2::render::BlendMode::Blend);
-                self.cursors.insert(c.id, CursorTex { tex: t, hotx: c.hotx, hoty: c.hoty, w: c.width as u32, h: c.height as u32 });
+                self.cursors.insert(
+                    c.id,
+                    CursorTex {
+                        tex: t,
+                        hotx: c.hotx,
+                        hoty: c.hoty,
+                        w: c.width as u32,
+                        h: c.height as u32,
+                    },
+                );
                 self.cursor_id = c.id;
             }
         }
     }
 }
-
 
 /// Draw the session screen and its overlays.
 pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
@@ -879,11 +1093,19 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
         if let Some((t, _, _)) = a.video_tex.as_ref() {
             let _ = f.g.canvas.copy(t, None, v.to_sdl());
         } else if a.connected {
-            f.g.text_centered("Waiting for the first picture…", Rect::new(0, 0, W as u32, H as u32), size::LARGE, false, theme::TEXT_DIM);
+            f.g.text_centered(
+                "Waiting for the first picture…",
+                Rect::new(0, 0, W as u32, H as u32),
+                size::LARGE,
+                false,
+                theme::TEXT_DIM,
+            );
         }
     }
     // Remote cursor for D-pad mouse use (the Magic Remote pointer is drawn by the TV).
-    let pointer_recent = a.last_pointer.is_some_and(|t| t.elapsed() < Duration::from_secs(3));
+    let pointer_recent = a
+        .last_pointer
+        .is_some_and(|t| t.elapsed() < Duration::from_secs(3));
     if a.settings.dpad_mode == DpadMode::Mouse && !pointer_recent && a.osk.is_none() {
         let v = a.view_rect();
         if let (Some(m), Some(c)) = (a.monitor(), a.cursors.get(&a.cursor_id)) {
@@ -918,9 +1140,22 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
     if let Some((txt, t)) = a.notice.clone() {
         if t.elapsed() < Duration::from_secs(7) {
             let w = (f.g.text_width(&txt, size::BODY, false) + 60).min(W - 120);
-            let r = Rect::new((W - w) / 2, H - 140 - a.osk.as_ref().map(|o| o.height()).unwrap_or(0), w as u32, 70);
+            let r = Rect::new(
+                (W - w) / 2,
+                H - 140 - a.osk.as_ref().map(|o| o.height()).unwrap_or(0),
+                w as u32,
+                70,
+            );
             f.g.round(r, 18, Color::RGBA(60, 40, 10, 230));
-            f.g.text_fit(&txt, r.x() + 30, r.y() + 18, size::BODY, false, theme::TEXT, w - 60);
+            f.g.text_fit(
+                &txt,
+                r.x() + 30,
+                r.y() + 18,
+                size::BODY,
+                false,
+                theme::TEXT,
+                w - 60,
+            );
         } else {
             a.notice = None;
         }
@@ -953,11 +1188,23 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
     }
 }
 
-
 fn draw_toolbar(app: &mut App, f: &mut Frame) {
     let Some(a) = app.active.as_mut() else { return };
-    f.g.fill(Rect::new(0, 0, W as u32, TOOLBAR_H as u32), Color::RGBA(10, 18, 34, 235));
-    let host = a.peer.as_ref().map(|p| if p.hostname.is_empty() { a.peer_id.clone() } else { p.hostname.clone() }).unwrap_or_default();
+    f.g.fill(
+        Rect::new(0, 0, W as u32, TOOLBAR_H as u32),
+        Color::RGBA(10, 18, 34, 235),
+    );
+    let host = a
+        .peer
+        .as_ref()
+        .map(|p| {
+            if p.hostname.is_empty() {
+                a.peer_id.clone()
+            } else {
+                p.hostname.clone()
+            }
+        })
+        .unwrap_or_default();
     f.g.text_fit(&host, 30, 14, size::BODY, true, theme::TEXT, 270);
     let status = format!(
         "{}{}",
@@ -983,7 +1230,16 @@ fn draw_toolbar(app: &mut App, f: &mut Frame) {
         ("tb-mode", mode_label.into(), Some(theme::YELLOW_KEY), "Yellow"),
         ("tb-view", "View".into(), None, ""),
         ("tb-keys", "Keys".into(), None, ""),
-        ("tb-audio", if a.settings.muted { "Unmute".into() } else { "Mute".into() }, None, ""),
+        (
+            "tb-audio",
+            if a.settings.muted {
+                "Unmute".into()
+            } else {
+                "Mute".into()
+            },
+            None,
+            "",
+        ),
         ("tb-quality", "Quality".into(), None, ""),
         ("tb-info", "Info".into(), None, ""),
         ("tb-disc", "Disconnect".into(), None, ""),
@@ -1063,8 +1319,21 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             title = "Monitors".to_owned();
             for (i, d) in a.displays.iter().enumerate() {
                 let cur = a.current.as_ref().is_some_and(|c| c.index == d.index);
-                let name = if d.name.is_empty() { format!("Monitor {}", i + 1) } else { d.name.clone() };
-                rows.push((format!("{}{} · {}x{}", if cur { "● " } else { "" }, name, d.width, d.height), Act::Monitor(i)));
+                let name = if d.name.is_empty() {
+                    format!("Monitor {}", i + 1)
+                } else {
+                    d.name.clone()
+                };
+                rows.push((
+                    format!(
+                        "{}{} · {}x{}",
+                        if cur { "● " } else { "" },
+                        name,
+                        d.width,
+                        d.height
+                    ),
+                    Act::Monitor(i),
+                ));
             }
         }
         Menu::View => {
@@ -1072,17 +1341,33 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             let hw = a.hardware();
             rows.push(("Fit to screen".into(), Act::View(ViewMode::Fit)));
             if hw {
-                rows.push(("1:1 and zoom need software decoding (hardware plane is full-screen)".into(), Act::Close));
+                rows.push((
+                    "1:1 and zoom need software decoding (hardware plane is full-screen)".into(),
+                    Act::Close,
+                ));
             } else {
                 rows.push(("Original size (1:1 pixels)".into(), Act::View(ViewMode::Original)));
-                rows.push((format!("Zoom in (now {:.1}x)", if a.view.mode == ViewMode::Zoom { a.view.zoom } else { 1.0 }), Act::ZoomIn));
+                rows.push((
+                    format!(
+                        "Zoom in (now {:.1}x)",
+                        if a.view.mode == ViewMode::Zoom {
+                            a.view.zoom
+                        } else {
+                            1.0
+                        }
+                    ),
+                    Act::ZoomIn,
+                ));
                 rows.push(("Zoom out".into(), Act::ZoomOut));
             }
             rows.push((
-                format!("Keyboard: {}", match a.settings.osk_presentation {
-                    OskPresentation::Shrink => "shrink picture above keyboard",
-                    OskPresentation::Overlay => "overlay lower picture",
-                }),
+                format!(
+                    "Keyboard: {}",
+                    match a.settings.osk_presentation {
+                        OskPresentation::Shrink => "shrink picture above keyboard",
+                        OskPresentation::Overlay => "overlay lower picture",
+                    }
+                ),
                 Act::OskPresentation,
             ));
         }
@@ -1095,33 +1380,134 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             rows.push(("Alt+Tab".into(), Act::Chord(&["Alt", "Tab"])));
             rows.push(("Alt+F4".into(), Act::Chord(&["Alt", "F4"])));
             rows.push(("Double-click".into(), Act::DoubleClick));
-            rows.push((if a.drag_lock { "Drag lock: on (OK releases)".into() } else { "Drag lock (hold left button)".into() }, Act::DragLock));
+            rows.push((
+                if a.drag_lock {
+                    "Drag lock: on (OK releases)".into()
+                } else {
+                    "Drag lock (hold left button)".into()
+                },
+                Act::DragLock,
+            ));
             rows.push(("Refresh video".into(), Act::Refresh));
             rows.push(("Release stuck keys and buttons".into(), Act::Release));
-            rows.push((format!("Lock on disconnect: {}", if a.settings.lock_on_disconnect { "on" } else { "off" }), Act::LockOnDisconnect));
+            rows.push((
+                format!(
+                    "Lock on disconnect: {}",
+                    if a.settings.lock_on_disconnect {
+                        "on"
+                    } else {
+                        "off"
+                    }
+                ),
+                Act::LockOnDisconnect,
+            ));
             rows.push(("Computer settings…".into(), Act::PeerSettings));
         }
         Menu::Quality => {
             title = "Picture quality".to_owned();
-            rows.push((format!("{}Balanced (default)", if a.settings.quality == Quality::Balanced { "● " } else { "" }), Act::Quality(Quality::Balanced)));
-            rows.push((format!("{}Best (sharpest text)", if a.settings.quality == Quality::Best { "● " } else { "" }), Act::Quality(Quality::Best)));
-            rows.push((format!("{}Low (fast)", if a.settings.quality == Quality::Low { "● " } else { "" }), Act::Quality(Quality::Low)));
+            rows.push((
+                format!(
+                    "{}Balanced (default)",
+                    if a.settings.quality == Quality::Balanced {
+                        "● "
+                    } else {
+                        ""
+                    }
+                ),
+                Act::Quality(Quality::Balanced),
+            ));
+            rows.push((
+                format!(
+                    "{}Best (sharpest text)",
+                    if a.settings.quality == Quality::Best {
+                        "● "
+                    } else {
+                        ""
+                    }
+                ),
+                Act::Quality(Quality::Best),
+            ));
+            rows.push((
+                format!(
+                    "{}Low (fast)",
+                    if a.settings.quality == Quality::Low {
+                        "● "
+                    } else {
+                        ""
+                    }
+                ),
+                Act::Quality(Quality::Low),
+            ));
             for fps in [30u32, 60] {
-                rows.push((format!("{}Frame rate {fps}", if a.settings.fps == fps { "● " } else { "" }), Act::Fps(fps)));
+                rows.push((
+                    format!(
+                        "{}Frame rate {fps}",
+                        if a.settings.fps == fps { "● " } else { "" }
+                    ),
+                    Act::Fps(fps),
+                ));
             }
         }
         Menu::Info => {
             title = "Session info".to_owned();
-            let p = a.presenting.map(|(c, hw, w, h)| format!("{} {}x{} · {}", c.name(), w, h, if hw { "hardware decoder" } else { "software decoder" })).unwrap_or_else(|| "no picture yet".into());
+            let p = a
+                .presenting
+                .map(|(c, hw, w, h)| {
+                    format!(
+                        "{} {}x{} · {}",
+                        c.name(),
+                        w,
+                        h,
+                        if hw {
+                            "hardware decoder"
+                        } else {
+                            "software decoder"
+                        }
+                    )
+                })
+                .unwrap_or_else(|| "no picture yet".into());
             let st = &a.pipe.stats;
             rows.push((format!("Video: {p}"), Act::Close));
-            rows.push((format!("Decoded {:.0} fps · received {} · dropped {}", a.fps_count.2, st.received.load(Ordering::Relaxed), st.dropped.load(Ordering::Relaxed)), Act::Close));
-            rows.push((format!("Audio queue {} ms{}", a.ring.queued_ms(), if a.settings.muted { " (muted)" } else { "" }), Act::Close));
-            let peer = a.peer.as_ref().map(|p| format!("{} · {} · RustDesk {}", p.hostname, p.platform, p.version)).unwrap_or_default();
+            rows.push((
+                format!(
+                    "Decoded {:.0} fps · received {} · dropped {}",
+                    a.fps_count.2,
+                    st.received.load(Ordering::Relaxed),
+                    st.dropped.load(Ordering::Relaxed)
+                ),
+                Act::Close,
+            ));
+            rows.push((
+                format!(
+                    "Audio queue {} ms{}",
+                    a.ring.queued_ms(),
+                    if a.settings.muted { " (muted)" } else { "" }
+                ),
+                Act::Close,
+            ));
+            let peer = a
+                .peer
+                .as_ref()
+                .map(|p| format!("{} · {} · RustDesk {}", p.hostname, p.platform, p.version))
+                .unwrap_or_default();
             rows.push((format!("Host: {peer}"), Act::Close));
-            rows.push((format!("Route: {} · {}", a.route.map(|r| r.label()).unwrap_or("?"), if a.secured { "end-to-end key negotiated" } else { "not end-to-end encrypted (no verified peer key)" }), Act::Close));
+            rows.push((
+                format!(
+                    "Route: {} · {}",
+                    a.route.map(|r| r.label()).unwrap_or("?"),
+                    if a.secured {
+                        "end-to-end key negotiated"
+                    } else {
+                        "not end-to-end encrypted (no verified peer key)"
+                    }
+                ),
+                Act::Close,
+            ));
             if a.uac {
-                rows.push(("The remote side shows an elevated (UAC) window".into(), Act::Close));
+                rows.push((
+                    "The remote side shows an elevated (UAC) window".into(),
+                    Act::Close,
+                ));
             }
         }
         Menu::None => return,
@@ -1132,7 +1518,10 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
     f.g.round(panel, 24, Color::RGBA(22, 33, 56, 248));
     f.g.text_fit(&title, x + 30, top + 26, size::LARGE, true, theme::TEXT, w - 60);
     let visible = ((H - top - 140) / (row_h + gap)).max(1) as usize;
-    let focused_index = rows.iter().enumerate().position(|(i, _)| f.is_focused(idx("menu-row", i)));
+    let focused_index = rows
+        .iter()
+        .enumerate()
+        .position(|(i, _)| f.is_focused(idx("menu-row", i)));
     let first = f.list_scroll(id("menu-list"), focused_index, visible, rows.len());
     let mut picked = None;
     for (i, (label, _)) in rows.iter().enumerate().skip(first).take(visible) {
@@ -1143,7 +1532,15 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
         if foc {
             f.focus_ring(r, 14);
         }
-        f.g.text_fit(label, r.x() + 24, r.y() + 20, size::BODY, false, theme::TEXT, w - 100);
+        f.g.text_fit(
+            label,
+            r.x() + 24,
+            r.y() + 20,
+            size::BODY,
+            false,
+            theme::TEXT,
+            w - 100,
+        );
         if act {
             picked = Some(i);
         }
@@ -1225,7 +1622,13 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
         Act::Release => {
             let rel = a.held.release_all();
             a.handle.send(SessionCommand::SendMany(rel));
-            for ck in [ControlKey::Control, ControlKey::Shift, ControlKey::Alt, ControlKey::Meta, ControlKey::RAlt] {
+            for ck in [
+                ControlKey::Control,
+                ControlKey::Shift,
+                ControlKey::Alt,
+                ControlKey::Meta,
+                ControlKey::RAlt,
+            ] {
                 a.send(input::control_key(ck, false, false, Mods::default()));
             }
             for b in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
@@ -1273,7 +1676,10 @@ mod tests {
     #[test]
     fn keycode_chars() {
         let none = KeyMods::default();
-        let shift = KeyMods { shift: true, ..Default::default() };
+        let shift = KeyMods {
+            shift: true,
+            ..Default::default()
+        };
         assert_eq!(keycode_char(Keycode::A, &none), Some('a'));
         assert_eq!(keycode_char(Keycode::A, &shift), Some('A'));
         assert_eq!(keycode_char(Keycode::Num1, &shift), Some('!'));

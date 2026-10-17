@@ -60,12 +60,6 @@ impl UiState {
     pub fn push(&mut self, i: UiIn) {
         self.pending.push(i);
     }
-    pub fn focus(&mut self, id: Id) {
-        self.want_focus = Some(id);
-    }
-    pub fn clear_pending(&mut self) {
-        self.pending.clear();
-    }
 }
 
 pub struct Frame<'a> {
@@ -79,7 +73,10 @@ pub struct Frame<'a> {
 }
 
 fn center(r: &Rect) -> (f32, f32) {
-    (r.x() as f32 + r.width() as f32 / 2.0, r.y() as f32 + r.height() as f32 / 2.0)
+    (
+        r.x() as f32 + r.width() as f32 / 2.0,
+        r.y() as f32 + r.height() as f32 / 2.0,
+    )
 }
 
 fn navigate(prev: &[(Id, Rect)], from: Id, dir: Nav) -> Option<Id> {
@@ -104,7 +101,9 @@ fn navigate(prev: &[(Id, Rect)], from: Id, dir: Nav) -> Option<Id> {
         // Prefer items overlapping on the cross axis.
         let overlap = match dir {
             Nav::Up | Nav::Down => r.x() < fr.x() + fr.width() as i32 && fr.x() < r.x() + r.width() as i32,
-            Nav::Left | Nav::Right => r.y() < fr.y() + fr.height() as i32 && fr.y() < r.y() + r.height() as i32,
+            Nav::Left | Nav::Right => {
+                r.y() < fr.y() + fr.height() as i32 && fr.y() < r.y() + r.height() as i32
+            }
         };
         let score = primary + secondary * if overlap { 0.3 } else { 2.5 };
         if best.is_none_or(|(s, _)| score < s) {
@@ -123,7 +122,9 @@ impl<'a> Frame<'a> {
             match i {
                 UiIn::Nav(d) => {
                     st.focused = match st.focused {
-                        Some(f) if st.prev.iter().any(|(i, _)| *i == f) => navigate(&st.prev, f, d).or(Some(f)),
+                        Some(f) if st.prev.iter().any(|(i, _)| *i == f) => {
+                            navigate(&st.prev, f, d).or(Some(f))
+                        }
                         _ => st.prev.first().map(|(i, _)| *i),
                     };
                 }
@@ -204,14 +205,6 @@ impl<'a> Frame<'a> {
         self.g.round(r, 20, theme::PANEL);
     }
 
-    pub fn label(&mut self, s: &str, x: i32, y: i32, px: f32, c: Color) {
-        self.g.text(s, x, y, px, false, c);
-    }
-
-    pub fn title(&mut self, s: &str, x: i32, y: i32) {
-        self.g.text(s, x, y, size::TITLE, true, theme::TEXT);
-    }
-
     /// Standard button. `primary` uses the accent colour.
     pub fn button(&mut self, id: Id, r: Rect, label: &str, primary: bool) -> bool {
         let (f, a) = self.register(id, r);
@@ -232,7 +225,14 @@ impl<'a> Frame<'a> {
 
     /// Button with a coloured remote-key badge (text label always present; colour is
     /// never the only cue).
-    pub fn key_button(&mut self, id: Id, r: Rect, label: &str, key_color: Option<Color>, key_name: &str) -> bool {
+    pub fn key_button(
+        &mut self,
+        id: Id,
+        r: Rect,
+        label: &str,
+        key_color: Option<Color>,
+        key_name: &str,
+    ) -> bool {
         let (f, a) = self.register(id, r);
         self.g.round(r, 14, if f { theme::PANEL_HI } else { theme::ROW });
         if f {
@@ -248,7 +248,8 @@ impl<'a> Frame<'a> {
         let w = self.g.text(label, x, ty, size::BODY, true, theme::TEXT);
         if !key_name.is_empty() {
             let kx = x + w + 12;
-            self.g.text(key_name, kx, ty + 3, size::SMALL, false, theme::TEXT_DIM);
+            self.g
+                .text(key_name, kx, ty + 3, size::SMALL, false, theme::TEXT_DIM);
         }
         a
     }
@@ -261,10 +262,30 @@ impl<'a> Frame<'a> {
             self.focus_ring(r, 12);
         }
         let ty = r.y() + (r.height() as i32 - self.g.line_height(size::BODY)) / 2 + 2;
-        self.g.text_fit(label, r.x() + 24, ty, size::BODY, false, theme::TEXT, r.width() as i32 - 200);
-        let pill = Rect::new(r.x() + r.width() as i32 - 140, r.y() + (r.height() as i32 - 40) / 2, 116, 40);
-        self.g.round(pill, 20, if on { theme::ACCENT } else { theme::PANEL });
-        self.g.text_centered(if on { "On" } else { "Off" }, pill, size::SMALL, true, theme::TEXT);
+        self.g.text_fit(
+            label,
+            r.x() + 24,
+            ty,
+            size::BODY,
+            false,
+            theme::TEXT,
+            r.width() as i32 - 200,
+        );
+        let pill = Rect::new(
+            r.x() + r.width() as i32 - 140,
+            r.y() + (r.height() as i32 - 40) / 2,
+            116,
+            40,
+        );
+        self.g
+            .round(pill, 20, if on { theme::ACCENT } else { theme::PANEL });
+        self.g.text_centered(
+            if on { "On" } else { "Off" },
+            pill,
+            size::SMALL,
+            true,
+            theme::TEXT,
+        );
         a
     }
 
@@ -276,27 +297,66 @@ impl<'a> Frame<'a> {
             self.focus_ring(r, 12);
         }
         let ty = r.y() + (r.height() as i32 - self.g.line_height(size::BODY)) / 2 + 2;
-        self.g.text_fit(label, r.x() + 24, ty, size::BODY, false, theme::TEXT, r.width() as i32 / 2);
+        self.g.text_fit(
+            label,
+            r.x() + 24,
+            ty,
+            size::BODY,
+            false,
+            theme::TEXT,
+            r.width() as i32 / 2,
+        );
         let vw = self.g.text_width(value, size::BODY, true);
         let vx = r.x() + r.width() as i32 - 24 - vw - 30;
         self.g.text(value, vx, ty, size::BODY, true, theme::ACCENT2);
-        self.g.text("›", r.x() + r.width() as i32 - 40, ty, size::BODY, true, theme::TEXT_DIM);
+        self.g.text(
+            "›",
+            r.x() + r.width() as i32 - 40,
+            ty,
+            size::BODY,
+            true,
+            theme::TEXT_DIM,
+        );
         a
     }
 
     /// Text field display (editing happens in the on-screen keyboard / physical keys).
-    pub fn field(&mut self, id: Id, r: Rect, label: &str, value: &str, secret: bool, placeholder: &str, editing: bool) -> bool {
+    #[allow(clippy::too_many_arguments)]
+    pub fn field(
+        &mut self,
+        id: Id,
+        r: Rect,
+        label: &str,
+        value: &str,
+        secret: bool,
+        placeholder: &str,
+        editing: bool,
+    ) -> bool {
         let (f, a) = self.register(id, r);
-        self.g.round(r, 12, if f || editing { theme::PANEL_HI } else { theme::ROW });
+        self.g
+            .round(r, 12, if f || editing { theme::PANEL_HI } else { theme::ROW });
         if f || editing {
             self.focus_ring(r, 12);
         }
-        self.g.text(label, r.x() + 20, r.y() + 8, size::SMALL, false, theme::TEXT_DIM);
-        let shown: String = if secret { "•".repeat(value.chars().count()) } else { value.to_owned() };
+        self.g
+            .text(label, r.x() + 20, r.y() + 8, size::SMALL, false, theme::TEXT_DIM);
+        let shown: String = if secret {
+            "•".repeat(value.chars().count())
+        } else {
+            value.to_owned()
+        };
         let vy = r.y() + r.height() as i32 - self.g.line_height(size::LARGE) - 6;
         let max_w = r.width() as i32 - 40;
         if shown.is_empty() && !editing {
-            self.g.text_fit(placeholder, r.x() + 20, vy, size::LARGE, false, Color::RGB(110, 125, 150), max_w);
+            self.g.text_fit(
+                placeholder,
+                r.x() + 20,
+                vy,
+                size::LARGE,
+                false,
+                Color::RGB(110, 125, 150),
+                max_w,
+            );
         } else {
             // Show the tail when the text overflows.
             let mut s = shown.clone();
@@ -304,24 +364,55 @@ impl<'a> Frame<'a> {
                 s.remove(0);
             }
             let w = self.g.text(&s, r.x() + 20, vy, size::LARGE, false, theme::TEXT);
-            if editing && (self.now_ms / 500) % 2 == 0 {
-                self.g.fill(Rect::new(r.x() + 22 + w, vy + 2, 3, self.g.line_height(size::LARGE) as u32 - 6), theme::ACCENT2);
+            if editing && (self.now_ms / 500).is_multiple_of(2) {
+                self.g.fill(
+                    Rect::new(
+                        r.x() + 22 + w,
+                        vy + 2,
+                        3,
+                        self.g.line_height(size::LARGE) as u32 - 6,
+                    ),
+                    theme::ACCENT2,
+                );
             }
         }
         a
     }
 
     /// List row with a title and subtitle.
-    pub fn row(&mut self, id: Id, r: Rect, title: &str, subtitle: &str, badge: Option<(&str, Color)>) -> bool {
+    pub fn row(
+        &mut self,
+        id: Id,
+        r: Rect,
+        title: &str,
+        subtitle: &str,
+        badge: Option<(&str, Color)>,
+    ) -> bool {
         let (f, a) = self.register(id, r);
         self.g.round(r, 14, if f { theme::PANEL_HI } else { theme::ROW });
         if f {
             self.focus_ring(r, 14);
         }
         let max_w = r.width() as i32 - 48 - if badge.is_some() { 180 } else { 0 };
-        self.g.text_fit(title, r.x() + 24, r.y() + 12, size::LARGE, true, theme::TEXT, max_w);
+        self.g.text_fit(
+            title,
+            r.x() + 24,
+            r.y() + 12,
+            size::LARGE,
+            true,
+            theme::TEXT,
+            max_w,
+        );
         if !subtitle.is_empty() {
-            self.g.text_fit(subtitle, r.x() + 24, r.y() + r.height() as i32 - 40, size::SMALL, false, theme::TEXT_DIM, max_w);
+            self.g.text_fit(
+                subtitle,
+                r.x() + 24,
+                r.y() + r.height() as i32 - 40,
+                size::SMALL,
+                false,
+                theme::TEXT_DIM,
+                max_w,
+            );
         }
         if let Some((b, c)) = badge {
             let bw = self.g.text_width(b, size::SMALL, true) + 28;
@@ -333,7 +424,13 @@ impl<'a> Frame<'a> {
     }
 
     /// Keep the focused index of a vertical list visible; returns the first visible index.
-    pub fn list_scroll(&mut self, list: Id, focused_index: Option<usize>, visible: usize, len: usize) -> usize {
+    pub fn list_scroll(
+        &mut self,
+        list: Id,
+        focused_index: Option<usize>,
+        visible: usize,
+        len: usize,
+    ) -> usize {
         let mut first = *self.st.scroll.get(&list).unwrap_or(&0) as usize;
         if let Some(fi) = focused_index {
             if fi < first {
@@ -342,13 +439,20 @@ impl<'a> Frame<'a> {
                 first = fi + 1 - visible;
             }
         }
+        if self.wheel != 0 && len > visible {
+            first = (first as i32 - self.wheel).clamp(0, (len - visible) as i32) as usize;
+            self.wheel = 0;
+        }
         first = first.min(len.saturating_sub(visible));
         self.st.scroll.insert(list, first as i32);
         first
     }
 
     pub fn scrim(&mut self) {
-        self.g.fill(Rect::new(0, 0, crate::gfx::W as u32, crate::gfx::H as u32), theme::SCRIM);
+        self.g.fill(
+            Rect::new(0, 0, crate::gfx::W as u32, crate::gfx::H as u32),
+            theme::SCRIM,
+        );
     }
 }
 

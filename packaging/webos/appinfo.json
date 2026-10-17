@@ -1,0 +1,14 @@
+{
+  "id": "io.github.danzig666.remotedesktv",
+  "version": "0.0.0",
+  "vendor": "RemoteDesk TV contributors",
+  "type": "native",
+  "main": "bin/remotedesk-tv",
+  "title": "RemoteDesk TV",
+  "icon": "icon.png",
+  "largeIcon": "icon_large.png",
+  "iconColor": "#006FFF",
+  "appDescription": "RustDesk-compatible remote desktop client (community project)",
+  "useAllMouseButtons": true,
+  "supportTouchMode": "full"
+}
