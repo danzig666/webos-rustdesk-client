@@ -17,11 +17,14 @@ anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
+# Tuned for fast test-build turnaround: no LTO, parallel codegen, no debug info (the IPK
+# binary is stripped anyway). Video/audio hot paths are the separately built C libraries.
 [profile.release]
 opt-level = 3
-lto = "thin"
-codegen-units = 4
-debug = 1
+lto = false
+codegen-units = 16
+debug = 0
+incremental = true
 panic = "unwind"
 
 [profile.dev.package."*"]

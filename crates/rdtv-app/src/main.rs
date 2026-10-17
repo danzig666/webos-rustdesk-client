@@ -13,6 +13,9 @@ mod view;
 
 use std::time::{Duration, Instant};
 
+/// Loaded SDL version and keyboard layout, shown in Diagnostics.
+pub static SDL_DESC: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
 fn main() {
     if std::env::args().any(|a| a == "--self-test") {
         std::process::exit(self_test());
@@ -41,6 +44,9 @@ fn run() -> anyhow::Result<()> {
     let sdl = sdl2::init().map_err(anyhow::Error::msg)?;
     let video = sdl.video().map_err(anyhow::Error::msg)?;
     log::info!("SDL video driver: {}", video.current_video_driver());
+    let (_, sdl_desc) = keys::init_key_abi();
+    log::info!("{sdl_desc}");
+    let _ = SDL_DESC.set(sdl_desc);
     let (w, h) = match video.current_display_mode(0) {
         Ok(m) if m.w > 0 && m.h > 0 => (m.w as u32, m.h as u32),
         _ => (1920, 1080),

@@ -29,6 +29,8 @@ env:
 jobs:
   host:
     name: format, lint, tests (desktop)
+    # Manual (test) releases skip the desktop test job for a faster IPK turnaround.
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -151,7 +153,10 @@ jobs:
   release:
     name: GitHub release
     needs: [host, webos]
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease_tag != '')
+    if: >-
+      always() && needs.webos.result == 'success' &&
+      (needs.host.result == 'success' || needs.host.result == 'skipped') &&
+      (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease_tag != ''))
     runs-on: ubuntu-24.04
     permissions:
       contents: write

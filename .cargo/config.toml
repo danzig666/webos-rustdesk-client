@@ -4,7 +4,10 @@
 linker = "scripts/webos-cc.sh"
 rustflags = [
   "-C", "target-feature=+v7,+neon,+vfp3,-soft-float",
+  # DT_RPATH (not DT_RUNPATH): the webOS launcher sets LD_LIBRARY_PATH=/usr/lib, which
+  # outranks RUNPATH and would load the TV's own SDL2 (LG event ABI) instead of the bundled one.
   "-C", "link-arg=-Wl,-rpath,$ORIGIN/../lib",
+  "-C", "link-arg=-Wl,--disable-new-dtags",
   "-C", "link-arg=-Wl,--as-needed",
   "--cfg", "getrandom_backend=\"linux_raw\"",
 ]

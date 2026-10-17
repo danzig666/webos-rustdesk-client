@@ -47,6 +47,20 @@ use std::{
 const TOOLBAR_HIDE: Duration = Duration::from_secs(5);
 const TOOLBAR_H: i32 = 104;
 const KEYBOARD_ACTIVE: Duration = Duration::from_secs(10);
+/// Holding the Magic Remote wheel/OK this long without moving = right click.
+const LONG_PRESS: Duration = Duration::from_millis(500);
+/// Pointer travel (UI px) that turns a held press into a drag instead of a long press.
+const DRAG_SLOP: i32 = 18;
+
+/// A left press that is not sent yet: it becomes a click (released early), a drag (pointer
+/// moved) or a right click (held for `LONG_PRESS`).
+#[derive(Debug, Clone, Copy)]
+struct PendingPress {
+    since: Instant,
+    ui: (i32, i32),
+    host: (i32, i32),
+    fired: bool,
+}
 
 struct Sink {
     pipe: Arc<VideoPipeline>,
@@ -122,6 +136,8 @@ pub struct ActiveSession {
     pointer_ui: (i32, i32),
     drag_lock: bool,
     ok_down: bool,
+    press: Option<PendingPress>,
+    last_ptr_button: Option<Instant>,
     keyboard_active_until: Option<Instant>,
     banner: Option<(String, Instant)>,
     win_alone: bool,
@@ -286,6 +302,8 @@ impl ActiveSession {
             pointer_ui: (W / 2, H / 2),
             drag_lock: false,
             ok_down: false,
+            press: None,
+            last_ptr_button: None,
             keyboard_active_until: None,
             banner: None,
             win_alone: false,
@@ -489,6 +507,7 @@ impl ActiveSession {
         self.dpad_since = None;
         self.drag_lock = false;
         self.ok_down = false;
+        self.press = None;
         if let Some(o) = self.osk.as_mut() {
             o.reset_modifiers();
         }
@@ -673,6 +692,15 @@ impl ActiveSession {
     }
 
     pub fn tick(&mut self) {
+        if let Some(p) = self.press.as_mut() {
+            if !p.fired && p.since.elapsed() >= LONG_PRESS {
+                p.fired = true;
+                let (x, y) = p.host;
+                self.move_to(x, y);
+                self.click(MouseButton::Right);
+                self.banner = Some(("Right click".into(), Instant::now()));
+            }
+        }
         if self.toolbar
             && self.menu == Menu::None
             && self.osk.is_none()
@@ -857,9 +885,27 @@ impl ActiveSession {
                                             self.banner = Some(("Drag lock released".into(), Instant::now()));
                                         }
                                     }
+                                } else if self
+                                    .last_ptr_button
+                                    .is_some_and(|t| t.elapsed() < Duration::from_millis(400))
+                                {
+                                    // The same wheel click already arrived as a mouse button.
                                 } else if down != self.ok_down {
+                                    // Short press = left click, long press = right click.
                                     self.ok_down = down;
-                                    self.send_button(MouseButton::Left, down);
+                                    if down {
+                                        self.press = Some(PendingPress {
+                                            since: Instant::now(),
+                                            ui: self.pointer_ui,
+                                            host: self.vmouse,
+                                            fired: false,
+                                        });
+                                    } else if let Some(p) = self.press.take() {
+                                        if !p.fired {
+                                            self.move_to(p.host.0, p.host.1);
+                                            self.click(MouseButton::Left);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -881,6 +927,15 @@ impl ActiveSession {
                         return true;
                     }
                 }
+                if let Some(p) = self.press {
+                    let moved = (x - p.ui.0).abs().max((y - p.ui.1).abs());
+                    if !p.fired && moved > DRAG_SLOP {
+                        // It is a drag: press at the original point, then follow the pointer.
+                        self.press = None;
+                        self.move_to(p.host.0, p.host.1);
+                        self.send_button(MouseButton::Left, true);
+                    }
+                }
                 if let Some((hx, hy)) = self.pointer_host(*x, *y) {
                     self.move_to(hx, hy);
                 }
@@ -897,13 +952,32 @@ impl ActiveSession {
                     self.touch_toolbar();
                     return true;
                 }
+                self.last_ptr_button = Some(Instant::now());
                 // Releases always go through (no stuck buttons), presses only on the picture.
                 let b = match button {
                     PtrButton::Left => MouseButton::Left,
                     PtrButton::Right => MouseButton::Right,
                     PtrButton::Middle => MouseButton::Middle,
                 };
-                if *down {
+                if *down && b == MouseButton::Left && !self.drag_lock {
+                    // Magic Remote wheel click: decided on release / movement / long press.
+                    if let Some((hx, hy)) = self.pointer_host(*x, *y) {
+                        self.move_to(hx, hy);
+                        self.press = Some(PendingPress {
+                            since: Instant::now(),
+                            ui: (*x, *y),
+                            host: (hx, hy),
+                            fired: false,
+                        });
+                    }
+                } else if !*down && b == MouseButton::Left && self.press.is_some() {
+                    if let Some(p) = self.press.take() {
+                        if !p.fired {
+                            self.move_to(p.host.0, p.host.1);
+                            self.click(MouseButton::Left);
+                        }
+                    }
+                } else if *down {
                     if let Some((hx, hy)) = self.pointer_host(*x, *y) {
                         self.move_to(hx, hy);
                         self.send_button(b, true);

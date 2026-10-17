@@ -125,7 +125,83 @@ pub fn is_webos() -> bool {
 }
 
 /// Poll all pending SDL events and translate them.
+/// Which `SDL_KeyboardEvent` layout the loaded libSDL2 uses.
+///
+/// LG's own SDL2 (in the TV's /usr/lib) inserts `Uint32 inputSource` after `windowID` in
+/// keyboard, text-editing and text-input events (openlgtv/buildroot-nc4
+/// `package/sdl2/webos/001-webos-input-structs.patch`). The bundled webosbrew backport uses
+/// upstream's layout. If the system library is loaded anyway (e.g. a launcher
+/// `LD_LIBRARY_PATH` winning over our rpath), decoding with the wrong layout shifts every
+/// key code: remote buttons stop working and digits turn into garbage. The layout is
+/// therefore chosen from the version of the library actually loaded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyAbi {
+    Upstream,
+    Lg,
+}
+
+static KEY_ABI: std::sync::OnceLock<KeyAbi> = std::sync::OnceLock::new();
+
+/// Detect (once) and log the loaded SDL version and keyboard event layout.
+pub fn init_key_abi() -> (KeyAbi, String) {
+    let mut v = sdl2::sys::SDL_version {
+        major: 0,
+        minor: 0,
+        patch: 0,
+    };
+    unsafe { sdl2::sys::SDL_GetVersion(&mut v) };
+    let forced = std::env::var("RDTV_SDL_ABI").ok();
+    let abi = match forced.as_deref() {
+        Some("lg") => KeyAbi::Lg,
+        Some("upstream") => KeyAbi::Upstream,
+        // LG's firmware SDL2 builds are 2.0.x (2.0.10 on webOS 5/6, 2.0.14 on 7+); the
+        // bundled backport is 2.30.12.
+        _ if is_webos() && v.major == 2 && v.minor == 0 => KeyAbi::Lg,
+        _ => KeyAbi::Upstream,
+    };
+    let _ = KEY_ABI.set(abi);
+    let desc = format!(
+        "SDL {}.{}.{} ({:?} keyboard event layout)",
+        v.major, v.minor, v.patch, abi
+    );
+    (abi, desc)
+}
+
+fn key_abi() -> KeyAbi {
+    *KEY_ABI.get().unwrap_or(&KeyAbi::Upstream)
+}
+
+struct RawKey {
+    down: bool,
+    repeat: bool,
+    scancode: i32,
+    sym: i32,
+    modstate: u16,
+}
+
+/// Read a keyboard event from raw event bytes using the detected layout.
+fn decode_key(raw: &sdl2::sys::SDL_Event, down: bool) -> RawKey {
+    let p = raw as *const sdl2::sys::SDL_Event as *const u8;
+    // Upstream: state@12 repeat@13 keysym{scancode@16 sym@20 mod@24}; LG: everything +4.
+    let off = match key_abi() {
+        KeyAbi::Upstream => 0,
+        KeyAbi::Lg => 4,
+    };
+    // SAFETY: SDL_Event is a 56-byte union; all offsets read are below 32.
+    unsafe {
+        RawKey {
+            down,
+            repeat: *p.add(13 + off) != 0,
+            scancode: std::ptr::read_unaligned(p.add(16 + off) as *const i32),
+            sym: std::ptr::read_unaligned(p.add(20 + off) as *const i32),
+            modstate: std::ptr::read_unaligned(p.add(24 + off) as *const u16),
+        }
+    }
+}
+
+/// Poll all pending SDL events and translate them.
 pub fn poll(out: &mut Vec<In>) {
+    use sdl2::sys::SDL_EventType as T;
     loop {
         let mut raw = std::mem::MaybeUninit::<sdl2::sys::SDL_Event>::uninit();
         // SAFETY: SDL_PollEvent fully initializes the event when it returns 1.
@@ -134,80 +210,86 @@ pub fn poll(out: &mut Vec<In>) {
         }
         let raw = unsafe { raw.assume_init() };
         let ty = unsafe { raw.type_ };
-        if ty == sdl2::sys::SDL_EventType::SDL_KEYDOWN as u32
-            || ty == sdl2::sys::SDL_EventType::SDL_KEYUP as u32
-        {
-            let k = unsafe { raw.key };
-            let sc = k.keysym.scancode as i32;
-            if let Some(r) = webos_remote_from_scancode(sc) {
+        if ty == T::SDL_KEYDOWN as u32 || ty == T::SDL_KEYUP as u32 {
+            let k = decode_key(&raw, ty == T::SDL_KEYDOWN as u32);
+            log::trace!("key sc={} sym={} down={}", k.scancode, k.sym, k.down);
+            if let Some(r) = webos_remote_from_scancode(k.scancode) {
                 out.push(In::Remote {
                     key: r,
-                    down: ty == sdl2::sys::SDL_EventType::SDL_KEYDOWN as u32,
-                    repeat: k.repeat != 0,
+                    down: k.down,
+                    repeat: k.repeat,
                 });
                 continue;
             }
+            if let Some(key) = Keycode::from_i32(k.sym) {
+                translate_key(
+                    key,
+                    Scancode::from_i32(k.scancode),
+                    Mod::from_bits_truncate(k.modstate),
+                    k.down,
+                    k.repeat,
+                    out,
+                );
+            }
+            continue;
+        }
+        if (ty == T::SDL_TEXTINPUT as u32 || ty == T::SDL_TEXTEDITING as u32) && key_abi() == KeyAbi::Lg {
+            continue; // text payload offset differs under LG's layout; text comes from keys
         }
         translate(Event::from_ll(raw), out);
+    }
+}
+
+fn translate_key(
+    key: Keycode,
+    scancode: Option<Scancode>,
+    keymod: Mod,
+    down: bool,
+    repeat: bool,
+    out: &mut Vec<In>,
+) {
+    let shared = match key {
+        Keycode::Up => Some(Remote::Up),
+        Keycode::Down => Some(Remote::Down),
+        Keycode::Left => Some(Remote::Left),
+        Keycode::Right => Some(Remote::Right),
+        Keycode::Return | Keycode::KpEnter => Some(Remote::Ok),
+        Keycode::AcBack => Some(Remote::Back),
+        _ if !is_webos() => match key {
+            Keycode::F1 => Some(Remote::Red),
+            Keycode::F2 => Some(Remote::Green),
+            Keycode::F3 => Some(Remote::Yellow),
+            Keycode::F4 => Some(Remote::Blue),
+            Keycode::F9 => Some(Remote::Back),
+            _ => None,
+        },
+        _ => None,
+    };
+    let mods = KeyMods::from_sdl(keymod);
+    match shared {
+        // Arrows/Enter with modifiers are keyboard shortcuts, not remote navigation.
+        Some(r)
+            if !(mods.ctrl || mods.alt || mods.gui || mods.shift)
+                || !matches!(
+                    r,
+                    Remote::Up | Remote::Down | Remote::Left | Remote::Right | Remote::Ok
+                ) =>
+        {
+            out.push(In::Remote { key: r, down, repeat })
+        }
+        _ => out.push(In::Key {
+            key,
+            scancode,
+            mods,
+            down,
+            repeat,
+        }),
     }
 }
 
 fn translate(ev: Event, out: &mut Vec<In>) {
     match ev {
         Event::Quit { .. } => out.push(In::Quit),
-        Event::KeyDown {
-            keycode,
-            scancode,
-            keymod,
-            repeat,
-            ..
-        }
-        | Event::KeyUp {
-            keycode,
-            scancode,
-            keymod,
-            repeat,
-            ..
-        } => {
-            let down = matches!(ev, Event::KeyDown { .. });
-            let Some(key) = keycode else { return };
-            let shared = match key {
-                Keycode::Up => Some(Remote::Up),
-                Keycode::Down => Some(Remote::Down),
-                Keycode::Left => Some(Remote::Left),
-                Keycode::Right => Some(Remote::Right),
-                Keycode::Return | Keycode::KpEnter => Some(Remote::Ok),
-                _ if !is_webos() => match key {
-                    Keycode::F1 => Some(Remote::Red),
-                    Keycode::F2 => Some(Remote::Green),
-                    Keycode::F3 => Some(Remote::Yellow),
-                    Keycode::F4 => Some(Remote::Blue),
-                    Keycode::F9 => Some(Remote::Back),
-                    _ => None,
-                },
-                _ => None,
-            };
-            let mods = KeyMods::from_sdl(keymod);
-            match shared {
-                // Arrows/Enter with modifiers are keyboard shortcuts, not remote navigation.
-                Some(r)
-                    if !(mods.ctrl || mods.alt || mods.gui || mods.shift)
-                        || !matches!(
-                            r,
-                            Remote::Up | Remote::Down | Remote::Left | Remote::Right | Remote::Ok
-                        ) =>
-                {
-                    out.push(In::Remote { key: r, down, repeat })
-                }
-                _ => out.push(In::Key {
-                    key,
-                    scancode,
-                    mods,
-                    down,
-                    repeat,
-                }),
-            }
-        }
         Event::TextInput { text, .. } => out.push(In::Text(text)),
         Event::MouseMotion { x, y, .. } => out.push(In::PointerMove { x, y }),
         Event::MouseButtonDown { mouse_btn, x, y, .. } | Event::MouseButtonUp { mouse_btn, x, y, .. } => {

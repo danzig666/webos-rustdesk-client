@@ -20,7 +20,8 @@ for f in "$@"; do
   dyn="$($RE -d "$f")"
   if [ "$f" = "$1" ]; then
     $RE -l "$f" | grep -q "Requesting program interpreter: /lib/ld-linux.so.3" || err "$f: unexpected interpreter"
-    echo "$dyn" | grep -q 'RUNPATH.*\[\$ORIGIN/../lib\]' || err "$f: RUNPATH must be \$ORIGIN/../lib"
+    echo "$dyn" | grep -q '(RPATH).*\[\$ORIGIN/../lib\]' || err "$f: DT_RPATH must be \$ORIGIN/../lib (RUNPATH loses to the launcher's LD_LIBRARY_PATH)"
+    if echo "$dyn" | grep -q '(RUNPATH)'; then err "$f: has DT_RUNPATH; link with --disable-new-dtags"; fi
     for n in $(echo "$dyn" | sed -n 's/.*NEEDED.*\[\(.*\)\]/\1/p'); do
       case "$n" in
         libSDL2-2.0.so.0|libc.so.6|libm.so.6|libpthread.so.0|libdl.so.2|librt.so.1|libgcc_s.so.1|ld-linux.so.3) echo "  needed: $n" ;;

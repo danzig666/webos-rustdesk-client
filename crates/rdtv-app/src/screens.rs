@@ -955,6 +955,10 @@ pub fn diagnostics_text(app: &App) -> String {
     ));
     s.push_str(&format!("Process: uid {uid}, {route}\n"));
     s.push_str(&format!(
+        "Graphics/input library: {}\n",
+        crate::SDL_DESC.get().map(|s| s.as_str()).unwrap_or("unknown")
+    ));
+    s.push_str(&format!(
         "NDL DirectMedia hardware decoder: {}\n",
         app.platform
             .ndl_error
