@@ -852,6 +852,17 @@ impl ActiveSession {
             In::Remote { key, down, repeat } => {
                 let (key, down, repeat) = (*key, *down, *repeat);
                 if key == Remote::Back {
+                    // The TV delivers a keyboard's Esc as the remote's Back (same webOS
+                    // scancode and keysym), so while the keyboard is in use Back is Esc for
+                    // the computer. Toolbar: Back after 10 s without typing, or the chord.
+                    let kb_active = self.keyboard_active_until.is_some_and(|t| Instant::now() < t);
+                    if kb_active && !local_overlay {
+                        if down {
+                            self.keyboard_active_until = Some(Instant::now() + KEYBOARD_ACTIVE);
+                        }
+                        self.physical_key(Keycode::Escape, &KeyMods::default(), down, repeat);
+                        return true;
+                    }
                     if down && !repeat {
                         if self.menu != Menu::None {
                             self.menu = Menu::None;

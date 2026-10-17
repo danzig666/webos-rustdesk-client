@@ -175,10 +175,12 @@ fn key_abi() -> KeyAbi {
 /// (which keys arrive, with which codes and modifiers) can be reported.
 static KEY_LOG: std::sync::Mutex<std::collections::VecDeque<String>> =
     std::sync::Mutex::new(std::collections::VecDeque::new());
-const KEY_LOG_LEN: usize = 10;
+const KEY_LOG_LEN: usize = 16;
 
 fn log_key(k: &RawKey) {
-    if k.repeat {
+    // Arrows (scancodes 79-82) and Enter/OK (40, keypad 88) are left out: they are what
+    // reaching the Diagnostics screen takes, and would push the interesting keys out.
+    if k.repeat || matches!(k.scancode, 40 | 79..=82 | 88) {
         return;
     }
     // Never `Keycode::name()`: for webOS remote keys SDL builds the name from an xkb keysym

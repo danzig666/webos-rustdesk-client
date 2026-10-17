@@ -50,7 +50,7 @@ empty and wait for someone at the computer to click Accept.
 | Arrow buttons | Mouse mode: move the mouse (hold to accelerate); OK clicks. Arrow mode: arrow keys, OK = Enter |
 | CH + / CH − | Scroll up / down |
 | Number buttons 0–9 | Type digits on the computer (and digits into the password/code dialogs) |
-| USB keyboard | Types on the computer; **Ctrl+Alt+Shift+Space** opens the toolbar |
+| USB/Bluetooth keyboard | Types on the computer; **Ctrl+Alt+Shift+Space** opens the toolbar. The TV reports the keyboard's **Esc** as the remote's Back, so for 10 s after you type, Back/Esc is sent to the computer as Esc; after that Back opens the toolbar again |
 
 No colour buttons? Everything is also in the **toolbar** (press Back): Keyboard, Monitor, Mouse/Arrows,
 View, Keys, Mute, Quality, Info, Disconnect.
