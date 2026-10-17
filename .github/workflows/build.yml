@@ -131,9 +131,11 @@ jobs:
           cat dist/ipk-verify.md >> "$GITHUB_STEP_SUMMARY"
           grep -q "All OK" dist/ipk-verify.md
       - name: Homebrew manifest
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.prerelease_tag || github.ref_name }}
         run: |
           python3 scripts/homebrew-manifest.py --ipk dist/*.ipk --version "${{ steps.ver.outputs.version }}" \
-            --tag "${GITHUB_REF_NAME}" --out "dist/${APP_ID}.manifest.json"
+            --tag "${RELEASE_TAG}" --out "dist/${APP_ID}.manifest.json"
       - name: Source archive (AGPL corresponding source, with submodules)
         run: |
           git ls-files --recurse-submodules -z | tar --null -czf "dist/remotedesk-tv-${{ steps.ver.outputs.version }}-source.tar.gz" --transform 's,^,remotedesk-tv/,' -T -
