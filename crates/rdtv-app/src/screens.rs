@@ -383,7 +383,7 @@ fn home(app: &mut App, f: &mut Frame) {
             theme::TEXT_DIM,
         );
     }
-    footer(f, "OK: connect · ⋯: options · Back: exit");
+    footer(f, "0-9: type an ID · OK: connect · ⋯: options · Back: exit");
 }
 
 // ----- settings ---------------------------------------------------------------------------
@@ -1077,7 +1077,7 @@ DejaVu fonts (Bitstream Vera / public domain), fontdue (MIT/Apache-2.0), rustls,
 
 fn help(_app: &mut App, f: &mut Frame) {
     header(f, "Buttons & help", "");
-    let rows: [(&str, Option<Color>, &str); 12] = [
+    let rows: [(&str, Option<Color>, &str); 13] = [
         ("Magic Remote pointer", None, "Moves the remote mouse. OK / click = left click. Wheel = scroll."),
         ("Red", Some(theme::RED_KEY), "Right click at the mouse position."),
         ("Green", Some(theme::GREEN_KEY), "Next monitor (wraps around). The monitor name is shown briefly."),
@@ -1085,6 +1085,7 @@ fn help(_app: &mut App, f: &mut Frame) {
         ("Blue", Some(theme::BLUE_KEY), "Open or close the on-screen keyboard."),
         ("Back (short)", None, "Closes the top menu or keyboard; otherwise shows or hides the session toolbar. Never disconnects."),
         ("Arrow buttons", None, "Mouse mode: move the pointer (hold to speed up), OK clicks. Arrow mode: send arrow keys, OK = Enter."),
+        ("Number buttons 0-9", None, "Type digits: IDs on Home, passwords and codes in dialogs, digits on the computer."),
         ("CH + / CH −", None, "Scroll up / down."),
         ("Keyboard", None, "Select Ctrl/Alt/Shift/Win once for the next key, twice to lock. EN→HU switches layout. More = F-keys and navigation keys."),
         ("Toolbar", None, "View (fit, 1:1, zoom), Keys & actions (Ctrl+Alt+Del, lock, double-click, drag lock), quality, info, disconnect."),
@@ -1100,7 +1101,7 @@ fn help(_app: &mut App, f: &mut Frame) {
         }
         f.g.text(name, x, y + 6, size::BODY, true, theme::TEXT);
         f.g.text_fit(desc, 560, y + 6, size::BODY, false, theme::TEXT_DIM, 1300);
-        y += 72;
+        y += 66;
     }
 }
 

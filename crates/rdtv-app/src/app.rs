@@ -646,10 +646,67 @@ impl App {
                     Keycode::Escape | Keycode::AcBack => self.back(),
                     Keycode::Tab if mods.shift => self.ui.push(UiIn::Nav(Nav::Up)),
                     Keycode::Tab => self.ui.push(UiIn::Nav(Nav::Down)),
-                    _ => {}
+                    other => {
+                        if let Some(d) =
+                            crate::keys::digit_of(other).filter(|_| !(mods.ctrl || mods.alt || mods.gui))
+                        {
+                            self.digit_entry(d);
+                        }
+                    }
                 }
             }
             _ => {}
+        }
+    }
+
+    /// A number button pressed outside a text editor: start editing the relevant field
+    /// with that digit (the ID field on Home, the password/code field in dialogs, or the
+    /// focused field), so IDs, passwords and codes can be typed on the remote's number pad.
+    fn digit_entry(&mut self, d: char) {
+        use crate::ui::id;
+        let focused = self.ui.focused;
+        let is = |name: &str| focused == Some(id(name));
+        let target = match &self.modal {
+            Some(Modal::Password { value, .. }) => Some((FieldTarget::Password, value.clone(), true)),
+            Some(Modal::TwoFactor { value, .. }) => Some((FieldTarget::TwoFactor, value.clone(), false)),
+            Some(Modal::Account) => {
+                let f = &self.account_form;
+                if is("acc-user") {
+                    Some((FieldTarget::AccountUser, f.user.clone(), false))
+                } else if is("acc-pass") {
+                    Some((FieldTarget::AccountPassword, f.password.clone(), true))
+                } else if f.challenge.is_some() {
+                    Some((FieldTarget::AccountCode, f.code.clone(), false))
+                } else {
+                    None
+                }
+            }
+            Some(_) => None,
+            None => match &self.screen {
+                Screen::Home if is("home-search") => Some((FieldTarget::Search, self.search.clone(), false)),
+                Screen::Home => Some((FieldTarget::HomeTarget, self.home_target.clone(), false)),
+                Screen::ProfileEdit(..) => {
+                    let p = &self.profile_form;
+                    [
+                        ("pf-name", FieldTarget::ProfileName, &p.name),
+                        ("pf-id", FieldTarget::ProfileIdServer, &p.id_server),
+                        ("pf-relay", FieldTarget::ProfileRelay, &p.relay),
+                        ("pf-api", FieldTarget::ProfileApi, &p.api),
+                        ("pf-key", FieldTarget::ProfileKey, &p.key),
+                        ("pf-import", FieldTarget::ProfileImport, &p.import),
+                    ]
+                    .into_iter()
+                    .find(|(n, _, _)| is(n))
+                    .map(|(_, t, v)| (t, v.clone(), false))
+                }
+                _ => None,
+            },
+        };
+        if let Some((target, value, secret)) = target {
+            self.open_editor(target, value, secret);
+            if let Some(ed) = self.editor.as_mut() {
+                ed.value.push(d);
+            }
         }
     }
 

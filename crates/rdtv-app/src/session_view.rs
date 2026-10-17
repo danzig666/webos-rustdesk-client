@@ -134,6 +134,22 @@ pub struct ActiveSession {
 }
 
 pub fn keycode_char(key: Keycode, mods: &KeyMods) -> Option<char> {
+    // Keypad digits (remote number buttons on some models, USB numpads) type digits.
+    if matches!(
+        key,
+        Keycode::Kp0
+            | Keycode::Kp1
+            | Keycode::Kp2
+            | Keycode::Kp3
+            | Keycode::Kp4
+            | Keycode::Kp5
+            | Keycode::Kp6
+            | Keycode::Kp7
+            | Keycode::Kp8
+            | Keycode::Kp9
+    ) {
+        return crate::keys::digit_of(key);
+    }
     let n = key.into_i32();
     if !(0x20..0x7f).contains(&n) {
         // Non-ASCII keycodes (e.g. a Hungarian keyboard's á) are the character itself.
@@ -920,7 +936,11 @@ impl ActiveSession {
                 repeat,
                 ..
             } => {
-                self.keyboard_active_until = Some(Instant::now() + KEYBOARD_ACTIVE);
+                // Remote number buttons look like keyboard digits; they must not flip the
+                // D-pad into keyboard-arrow mode.
+                if crate::keys::digit_of(*key).is_none() {
+                    self.keyboard_active_until = Some(Instant::now() + KEYBOARD_ACTIVE);
+                }
                 if self.menu != Menu::None {
                     return false;
                 }
@@ -1684,5 +1704,7 @@ mod tests {
         assert_eq!(keycode_char(Keycode::A, &shift), Some('A'));
         assert_eq!(keycode_char(Keycode::Num1, &shift), Some('!'));
         assert_eq!(keycode_char(Keycode::F1, &none), None);
+        assert_eq!(keycode_char(Keycode::Kp5, &shift), Some('5'));
+        assert_eq!(keycode_char(Keycode::Num5, &none), Some('5'));
     }
 }

@@ -238,6 +238,26 @@ fn translate(ev: Event, out: &mut Vec<In>) {
     }
 }
 
+/// The digit of a number key. The Magic Remote's number buttons arrive through the
+/// SDL-webOS fork's default XKB mapping as ordinary digit keys (the fork maps only the
+/// colour/navigation/media buttons specially); some remotes and USB keypads report keypad
+/// codes instead, so both are accepted.
+pub fn digit_of(key: Keycode) -> Option<char> {
+    Some(match key {
+        Keycode::Num0 | Keycode::Kp0 => '0',
+        Keycode::Num1 | Keycode::Kp1 => '1',
+        Keycode::Num2 | Keycode::Kp2 => '2',
+        Keycode::Num3 | Keycode::Kp3 => '3',
+        Keycode::Num4 | Keycode::Kp4 => '4',
+        Keycode::Num5 | Keycode::Kp5 => '5',
+        Keycode::Num6 | Keycode::Kp6 => '6',
+        Keycode::Num7 | Keycode::Kp7 => '7',
+        Keycode::Num8 | Keycode::Kp8 => '8',
+        Keycode::Num9 | Keycode::Kp9 => '9',
+        _ => return None,
+    })
+}
+
 /// Map a physical keyboard key to the remote key it should send.
 pub enum RemoteKey {
     Control(rdtv_core::message_proto::ControlKey),
@@ -314,6 +334,13 @@ mod tests {
         assert_eq!(webos_remote_from_scancode(489), Some(Remote::Blue));
         assert_eq!(webos_remote_from_scancode(482), Some(Remote::Back));
         assert_eq!(webos_remote_from_scancode(4), None);
+    }
+
+    #[test]
+    fn remote_number_buttons_are_digits() {
+        assert_eq!(digit_of(Keycode::Num7), Some('7'));
+        assert_eq!(digit_of(Keycode::Kp0), Some('0'));
+        assert_eq!(digit_of(Keycode::A), None);
     }
 
     #[test]

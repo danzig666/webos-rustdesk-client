@@ -22,6 +22,8 @@ computers it talks to. Without it, connections still work but are not verified e
 ## Home
 
 * **Computer ID or address**: press OK and type with the on-screen or a USB keyboard, then **Connect**.
+  Or just press the remote's **number buttons**: the ID field opens with the digits already entered,
+  and OK (on **Done**) connects.
 * **Favorites / Recent / Address book** tabs: OK connects; **⋯** opens options (favourite, rename,
   computer settings, forget saved password, remove from recent).
 * **Server:** button: switch server profile. Each profile has its own favourites, history, saved
@@ -47,6 +49,7 @@ empty and wait for someone at the computer to click Accept.
 | **Back** (short press) | Closes the open menu or keyboard; otherwise shows/hides the toolbar. Never disconnects |
 | Arrow buttons | Mouse mode: move the mouse (hold to accelerate); OK clicks. Arrow mode: arrow keys, OK = Enter |
 | CH + / CH − | Scroll up / down |
+| Number buttons 0–9 | Type digits on the computer (and digits into the password/code dialogs) |
 | USB keyboard | Types on the computer; **Ctrl+Alt+Shift+Space** opens the toolbar |
 
 No colour buttons? Everything is also in the **toolbar** (press Back): Keyboard, Monitor, Mouse/Arrows,
