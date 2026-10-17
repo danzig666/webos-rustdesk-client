@@ -12,7 +12,7 @@ Each result says what kind of evidence it is: **unit test (CI)**, **emulation (C
 | Cross-compile for `armv7-unknown-linux-gnueabi` with the webOS SDK | build | the TV binary links against the SDK sysroot |
 | `scripts/elf-audit.sh` | static | ELF32 ARM, softfp ABI, `/lib/ld-linux.so.3`, NEEDED allowlist, glibc ≤ 2.28 (actual max 2.12), no GLIBCXX, RUNPATH `$ORIGIN/../lib`, NDL not linked |
 | `scripts/smoke-armel.sh` (`--self-test` under qemu-arm, Debian armel glibc 2.36) | emulation | the ARM binary starts on a modern glibc and its static libvpx/libopus/libsodium, key decoding and storage work |
-| `webosbrew-ipk-verify --fw-releases '>=5'` | static | IPK checked against webOS firmware symbol dumps |
+| `webosbrew-ipk-verify --fw-releases '>=5'` | static | IPK checked against webOS firmware symbol dumps. First CI run: **All OK** for 5.3.1, 6.4.0, 7.4.0, 8.3.0, 9.2.0, 10.2.0 and 11.2.0 |
 
 ## Manual, in the development container (2026-10-17)
 

@@ -126,9 +126,10 @@ jobs:
         run: |
           gh release download v20260818-ea38b20 --repo webosbrew/dev-toolbox-cli --pattern '*_amd64.deb' --dir build/toolbox
           sudo apt-get install -y ./build/toolbox/*.deb
-          webosbrew-ipk-verify dist/*.ipk --fw-releases '>=5' --details --format markdown | tee dist/ipk-verify.md || {
-            echo "::warning::webosbrew-ipk-verify reported problems (see dist/ipk-verify.md)"; }
-          cat dist/ipk-verify.md >> "$GITHUB_STEP_SUMMARY" || true
+          set -o pipefail
+          webosbrew-ipk-verify dist/*.ipk --fw-releases '>=5' --details --format markdown | tee dist/ipk-verify.md
+          cat dist/ipk-verify.md >> "$GITHUB_STEP_SUMMARY"
+          grep -q "All OK" dist/ipk-verify.md
       - name: Homebrew manifest
         run: |
           python3 scripts/homebrew-manifest.py --ipk dist/*.ipk --version "${{ steps.ver.outputs.version }}" \

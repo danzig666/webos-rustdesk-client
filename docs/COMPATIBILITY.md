@@ -11,6 +11,7 @@ labelled with what it actually rests on.
 | Protocol probe, x86_64 | same | same | same | VP9 1080p decoded, 0 drops, cursor, input, close reason |
 | Protocol probe, **ARM (webOS toolchain build)** under qemu-arm, Debian armel glibc 2.36 userland | same | same | same | Connected, logged in, NEON libvpx decoded 1080p VP9 (35/35 frames), input delivered |
 | `remotedesk-tv --self-test`, ARM under qemu (armel) | container and GitHub Actions | — | — | libvpx, libopus, libsodium, key decoding, storage: PASS |
+| IPK + ELF symbol check: `webosbrew-ipk-verify` 0.9.0 against firmware symbol dumps | GitHub Actions (run 1) | — | — | **All OK** for webOS **5.3.1, 6.4.0, 7.4.0, 8.3.0, 9.2.0, 10.2.0, 11.2.0** (binary and bundled `libSDL2-2.0.so.0`). Every imported library and symbol exists on those firmwares (static check, not a launch) |
 
 Evidence: [evidence/2026-10-17-linux-host-probe.md](evidence/2026-10-17-linux-host-probe.md).
 
