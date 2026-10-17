@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = ["crates/rdtv-core", "crates/rdtv-media", "crates/rdtv-app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+repository = "https://github.com/danzig666/webos-rustdesk-client"
+
+[workspace.dependencies]
+# Upstream RustDesk 1.5.0 (fada664) workspace libraries, pinned through the git submodule.
+hbb_common = { path = "third_party/rustdesk/libs/hbb_common" }
+base = { path = "third_party/rustdesk/libs/base" }
+log = "0.4"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+debug = 1
+panic = "unwind"
+
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,15 @@
+# webOS TV target: 32-bit ARM, softfp calling convention (the SDK's float ABI), with
+# hardware FP/NEON code generation. `-soft-float` changes codegen only, not the C ABI.
+[target.armv7-unknown-linux-gnueabi]
+linker = "scripts/webos-cc.sh"
+rustflags = [
+  "-C", "target-feature=+v7,+neon,+vfp3,-soft-float",
+  "-C", "link-arg=-Wl,-rpath,$ORIGIN/../lib",
+  "-C", "link-arg=-Wl,--as-needed",
+  "--cfg", "getrandom_backend=\"linux_raw\"",
+]
+
+[env]
+CC_armv7_unknown_linux_gnueabi = { value = "scripts/webos-cc.sh", relative = true }
+CXX_armv7_unknown_linux_gnueabi = { value = "scripts/webos-cxx.sh", relative = true }
+PKG_CONFIG_ALLOW_CROSS = "1"

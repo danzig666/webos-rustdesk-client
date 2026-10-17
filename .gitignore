@@ -1,0 +1,7 @@
+/target
+/dist
+/build
+/deps-out
+*.ipk
+/device.local.*
+.env

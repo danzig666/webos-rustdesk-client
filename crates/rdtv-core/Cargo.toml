@@ -1,0 +1,19 @@
+[package]
+name = "rdtv-core"
+description = "RustDesk-compatible outbound session core for RemoteDesk TV (client only)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+hbb_common.workspace = true
+base.workspace = true
+log.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# Static OpenSSL so the TV's (unknown-version) libssl is never required by hbb_common's native-tls.
+openssl = { version = "0.10", features = ["vendored"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,8 @@
+[package]
+name = "rdtv-media"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[dependencies]
+log.workspace = true
+anyhow.workspace = true
