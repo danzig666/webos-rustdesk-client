@@ -1422,16 +1422,13 @@ fn draw_toolbar(app: &mut App, f: &mut Frame) {
             }
         })
         .unwrap_or_default();
-    f.g.text_fit(&host, 30, 14, size::BODY, true, theme::TEXT, 270);
     let status = format!(
         "{}{}",
         a.route.map(|r| r.label()).unwrap_or(""),
         if a.secured { " · encrypted" } else { "" }
     );
-    f.g.text_fit(&status, 30, 56, size::SMALL, false, theme::TEXT_DIM, 270);
     let y = 18;
     let h = 68u32;
-    let mut x = 310;
     let mon_label = a
         .current
         .as_ref()
@@ -1461,10 +1458,21 @@ fn draw_toolbar(app: &mut App, f: &mut Frame) {
         ("tb-info", "Info".into(), None, ""),
         ("tb-disc", "Disconnect".into(), None, ""),
     ];
+    // Buttons are right-aligned; the connection name and status get the rest of the width.
+    let widths: Vec<i32> = items
+        .iter()
+        .map(|(_, label, col, _)| {
+            f.g.text_width(label, size::BODY, true) + if col.is_some() { 66 } else { 36 }
+        })
+        .collect();
+    let buttons_w: i32 = widths.iter().map(|w| w + 10).sum::<i32>() - 10;
+    let mut x = (W - 24 - buttons_w).max(310);
+    let left_w = x - 30 - 20;
+    f.g.text_fit(&host, 30, 14, size::BODY, true, theme::TEXT, left_w);
+    f.g.text_fit(&status, 30, 56, size::SMALL, false, theme::TEXT_DIM, left_w);
     let mut clicked = None;
-    for (key, label, col, kn) in items.iter() {
+    for ((key, label, col, kn), w) in items.iter().zip(widths) {
         let _ = kn;
-        let w = f.g.text_width(label, size::BODY, true) + if col.is_some() { 66 } else { 36 };
         let r = Rect::new(x, y, w as u32, h);
         if f.key_button(id(key), r, label, *col, "") {
             clicked = Some(*key);
