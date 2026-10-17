@@ -84,7 +84,7 @@ fn main() {
     };
     let h = session::start(rt.handle(), req, sink, Arc::new(move |gen, e| {
         match &e {
-            SessionEvent::Connected { peer, route, secured } => {
+            SessionEvent::Connected { peer, route, secured, .. } => {
                 println!("CONNECTED gen={gen} host={} platform={} version={} route={} secured={secured} displays={:?}",
                     peer.hostname, peer.platform, peer.version, route.label(),
                     peer.displays.iter().map(|d| (d.index, d.x, d.y, d.width, d.height, d.name.clone())).collect::<Vec<_>>());

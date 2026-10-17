@@ -1,0 +1,294 @@
+//! Platform input decoding.
+//!
+//! webOS remote buttons arrive from the SDL-webOS fork as keyboard events with fork-specific
+//! scancodes (SDL2 2.30.x fork, `include/SDL_scancode.h`): HOME 384, CH_UP 480,
+//! CH_DOWN 481, BACK 482, RED 486, GREEN 487, YELLOW 488, BLUE 489, EXIT 505. The `sdl2`
+//! crate has no variants for them, so raw events are inspected before conversion.
+//! On a desktop build (simulator) F1..F4 stand in for the colour keys and F9 for Back.
+
+use sdl2::{
+    event::Event,
+    keyboard::{Keycode, Mod, Scancode},
+    mouse::MouseButton as SdlButton,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Remote {
+    Up,
+    Down,
+    Left,
+    Right,
+    Ok,
+    Back,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Exit,
+    Home,
+    ChUp,
+    ChDown,
+}
+
+impl Remote {
+    pub fn label(self) -> &'static str {
+        match self {
+            Remote::Red => "Red",
+            Remote::Green => "Green",
+            Remote::Yellow => "Yellow",
+            Remote::Blue => "Blue",
+            Remote::Back => "Back",
+            _ => "",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PtrButton {
+    Left,
+    Right,
+    Middle,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct KeyMods {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    pub gui: bool,
+    pub altgr: bool,
+    pub caps: bool,
+}
+
+impl KeyMods {
+    fn from_sdl(m: Mod) -> KeyMods {
+        KeyMods {
+            ctrl: m.intersects(Mod::LCTRLMOD | Mod::RCTRLMOD),
+            alt: m.intersects(Mod::LALTMOD),
+            altgr: m.intersects(Mod::RALTMOD | Mod::MODEMOD),
+            shift: m.intersects(Mod::LSHIFTMOD | Mod::RSHIFTMOD),
+            gui: m.intersects(Mod::LGUIMOD | Mod::RGUIMOD),
+            caps: m.intersects(Mod::CAPSMOD),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum In {
+    /// TV remote buttons (and arrows/Enter, which a remote and a keyboard share).
+    Remote { key: Remote, down: bool, repeat: bool },
+    /// A physical keyboard key that is not a shared navigation key.
+    Key {
+        key: Keycode,
+        scancode: Option<Scancode>,
+        mods: KeyMods,
+        down: bool,
+        repeat: bool,
+    },
+    Text(String),
+    PointerMove { x: i32, y: i32 },
+    PointerButton { button: PtrButton, down: bool, x: i32, y: i32 },
+    Wheel { dx: i32, dy: i32 },
+    Focus(bool),
+    Quit,
+}
+
+const WEBOS_HOME: i32 = 384;
+const WEBOS_CH_UP: i32 = 480;
+const WEBOS_CH_DOWN: i32 = 481;
+const WEBOS_BACK: i32 = 482;
+const WEBOS_RED: i32 = 486;
+const WEBOS_GREEN: i32 = 487;
+const WEBOS_YELLOW: i32 = 488;
+const WEBOS_BLUE: i32 = 489;
+const WEBOS_EXIT: i32 = 505;
+
+pub fn webos_remote_from_scancode(sc: i32) -> Option<Remote> {
+    Some(match sc {
+        WEBOS_HOME => Remote::Home,
+        WEBOS_CH_UP => Remote::ChUp,
+        WEBOS_CH_DOWN => Remote::ChDown,
+        WEBOS_BACK => Remote::Back,
+        WEBOS_RED => Remote::Red,
+        WEBOS_GREEN => Remote::Green,
+        WEBOS_YELLOW => Remote::Yellow,
+        WEBOS_BLUE => Remote::Blue,
+        WEBOS_EXIT => Remote::Exit,
+        _ => return None,
+    })
+}
+
+pub fn is_webos() -> bool {
+    cfg!(target_arch = "arm")
+}
+
+/// Poll all pending SDL events and translate them.
+pub fn poll(out: &mut Vec<In>) {
+    loop {
+        let mut raw = std::mem::MaybeUninit::<sdl2::sys::SDL_Event>::uninit();
+        // SAFETY: SDL_PollEvent fully initializes the event when it returns 1.
+        if unsafe { sdl2::sys::SDL_PollEvent(raw.as_mut_ptr()) } == 0 {
+            break;
+        }
+        let raw = unsafe { raw.assume_init() };
+        let ty = unsafe { raw.type_ };
+        if ty == sdl2::sys::SDL_EventType::SDL_KEYDOWN as u32
+            || ty == sdl2::sys::SDL_EventType::SDL_KEYUP as u32
+        {
+            let k = unsafe { raw.key };
+            let sc = k.keysym.scancode as i32;
+            if let Some(r) = webos_remote_from_scancode(sc) {
+                out.push(In::Remote {
+                    key: r,
+                    down: ty == sdl2::sys::SDL_EventType::SDL_KEYDOWN as u32,
+                    repeat: k.repeat != 0,
+                });
+                continue;
+            }
+        }
+        translate(Event::from_ll(raw), out);
+    }
+}
+
+fn translate(ev: Event, out: &mut Vec<In>) {
+    match ev {
+        Event::Quit { .. } => out.push(In::Quit),
+        Event::KeyDown { keycode, scancode, keymod, repeat, .. }
+        | Event::KeyUp { keycode, scancode, keymod, repeat, .. } => {
+            let down = matches!(ev, Event::KeyDown { .. });
+            let Some(key) = keycode else { return };
+            let shared = match key {
+                Keycode::Up => Some(Remote::Up),
+                Keycode::Down => Some(Remote::Down),
+                Keycode::Left => Some(Remote::Left),
+                Keycode::Right => Some(Remote::Right),
+                Keycode::Return | Keycode::KpEnter => Some(Remote::Ok),
+                _ if !is_webos() => match key {
+                    Keycode::F1 => Some(Remote::Red),
+                    Keycode::F2 => Some(Remote::Green),
+                    Keycode::F3 => Some(Remote::Yellow),
+                    Keycode::F4 => Some(Remote::Blue),
+                    Keycode::F9 => Some(Remote::Back),
+                    _ => None,
+                },
+                _ => None,
+            };
+            let mods = KeyMods::from_sdl(keymod);
+            match shared {
+                // Arrows/Enter with modifiers are keyboard shortcuts, not remote navigation.
+                Some(r) if !(mods.ctrl || mods.alt || mods.gui || mods.shift) || !matches!(r, Remote::Up | Remote::Down | Remote::Left | Remote::Right | Remote::Ok) => {
+                    out.push(In::Remote { key: r, down, repeat })
+                }
+                _ => out.push(In::Key { key, scancode, mods, down, repeat }),
+            }
+        }
+        Event::TextInput { text, .. } => out.push(In::Text(text)),
+        Event::MouseMotion { x, y, .. } => out.push(In::PointerMove { x, y }),
+        Event::MouseButtonDown { mouse_btn, x, y, .. } | Event::MouseButtonUp { mouse_btn, x, y, .. } => {
+            let down = matches!(ev, Event::MouseButtonDown { .. });
+            let button = match mouse_btn {
+                SdlButton::Left => PtrButton::Left,
+                SdlButton::Right => PtrButton::Right,
+                SdlButton::Middle => PtrButton::Middle,
+                _ => return,
+            };
+            out.push(In::PointerButton { button, down, x, y });
+        }
+        Event::MouseWheel { x, y, .. } => out.push(In::Wheel { dx: x, dy: y }),
+        Event::Window { win_event, .. } => match win_event {
+            sdl2::event::WindowEvent::FocusGained | sdl2::event::WindowEvent::Shown => out.push(In::Focus(true)),
+            sdl2::event::WindowEvent::FocusLost | sdl2::event::WindowEvent::Hidden => out.push(In::Focus(false)),
+            _ => {}
+        },
+        Event::AppWillEnterBackground { .. } | Event::AppDidEnterBackground { .. } => out.push(In::Focus(false)),
+        Event::AppDidEnterForeground { .. } => out.push(In::Focus(true)),
+        _ => {}
+    }
+}
+
+/// Map a physical keyboard key to the remote key it should send.
+pub enum RemoteKey {
+    Control(rdtv_core::message_proto::ControlKey),
+    Char(char),
+}
+
+pub fn physical_to_remote(key: Keycode, mods: &KeyMods) -> Option<RemoteKey> {
+    use rdtv_core::message_proto::ControlKey as C;
+    let ck = match key {
+        Keycode::Escape => C::Escape,
+        Keycode::Tab => C::Tab,
+        Keycode::Backspace => C::Backspace,
+        Keycode::Delete => C::Delete,
+        Keycode::Insert => C::Insert,
+        Keycode::Home => C::Home,
+        Keycode::End => C::End,
+        Keycode::PageUp => C::PageUp,
+        Keycode::PageDown => C::PageDown,
+        Keycode::Up => C::UpArrow,
+        Keycode::Down => C::DownArrow,
+        Keycode::Left => C::LeftArrow,
+        Keycode::Right => C::RightArrow,
+        Keycode::Return => C::Return,
+        Keycode::KpEnter => C::NumpadEnter,
+        Keycode::Space if mods.ctrl || mods.alt || mods.gui => C::Space,
+        Keycode::CapsLock => C::CapsLock,
+        Keycode::NumLockClear => C::NumLock,
+        Keycode::ScrollLock => C::Scroll,
+        Keycode::PrintScreen => C::Snapshot,
+        Keycode::Pause => C::Pause,
+        Keycode::Application | Keycode::Menu => C::Apps,
+        Keycode::F1 => C::F1,
+        Keycode::F2 => C::F2,
+        Keycode::F3 => C::F3,
+        Keycode::F4 => C::F4,
+        Keycode::F5 => C::F5,
+        Keycode::F6 => C::F6,
+        Keycode::F7 => C::F7,
+        Keycode::F8 => C::F8,
+        Keycode::F9 => C::F9,
+        Keycode::F10 => C::F10,
+        Keycode::F11 => C::F11,
+        Keycode::F12 => C::F12,
+        Keycode::LCtrl | Keycode::RCtrl => C::Control,
+        Keycode::LShift => C::Shift,
+        Keycode::RShift => C::RShift,
+        Keycode::LAlt => C::Alt,
+        Keycode::RAlt => C::RAlt,
+        Keycode::LGui | Keycode::RGui => C::Meta,
+        _ => {
+            // Character keys only matter here when a hotkey modifier is held; plain text
+            // arrives through TextInput.
+            if mods.ctrl || mods.alt || mods.gui {
+                let n = key.into_i32();
+                if (0x20..0x7f).contains(&n) {
+                    return Some(RemoteKey::Char((n as u8 as char).to_ascii_lowercase()));
+                }
+            }
+            return None;
+        }
+    };
+    Some(RemoteKey::Control(ck))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn webos_colour_and_back_scancodes() {
+        assert_eq!(webos_remote_from_scancode(486), Some(Remote::Red));
+        assert_eq!(webos_remote_from_scancode(487), Some(Remote::Green));
+        assert_eq!(webos_remote_from_scancode(488), Some(Remote::Yellow));
+        assert_eq!(webos_remote_from_scancode(489), Some(Remote::Blue));
+        assert_eq!(webos_remote_from_scancode(482), Some(Remote::Back));
+        assert_eq!(webos_remote_from_scancode(4), None);
+    }
+
+    #[test]
+    fn hotkey_letters_are_sent_as_chars() {
+        let m = KeyMods { ctrl: true, ..Default::default() };
+        assert!(matches!(physical_to_remote(Keycode::C, &m), Some(RemoteKey::Char('c'))));
+        assert!(physical_to_remote(Keycode::C, &KeyMods::default()).is_none());
+        assert!(matches!(physical_to_remote(Keycode::F5, &KeyMods::default()), Some(RemoteKey::Control(_))));
+    }
+}

@@ -92,5 +92,16 @@ if [ ! -f "$OUT/lib/libopus.a" ]; then
     make install >/dev/null
   )
 fi
+# SDL2 with webOS integration (webosbrew/SDL-webOS backport, upstream struct ABI), bundled
+# into the IPK under lib/ because the TV's own SDL2 has LG's modified event ABI.
+if [ "$TARGET" = webos ] && [ ! -f "$OUT/lib/libSDL2-2.0.so.0" ]; then
+  SDL_TAG=release-2.30.12-webos.6
+  SDL_SHA=63dc9ea268bdf64801fce5e0c19585ee6aaf79f0b08486c853c47f922385c698
+  fetch "https://github.com/webosbrew/SDL-webOS/releases/download/$SDL_TAG/SDL2-2.30.12-webos.tar.gz" "$SDL_SHA" "SDL2-2.30.12-webos.tar.gz"
+  mkdir -p "$OUT/sdl2" && tar xzf "$SRC/SDL2-2.30.12-webos.tar.gz" -C "$OUT/sdl2"
+  cp -a "$OUT/sdl2/lib/libSDL2-2.0.so"* "$OUT/sdl2/lib/libSDL2.so" "$OUT/lib/"
+  mkdir -p "$OUT/include" && cp -a "$OUT/sdl2/include/SDL2" "$OUT/include/"
+  mkdir -p "$OUT/licenses" && cp -a "$OUT/sdl2/share/licenses/SDL2" "$OUT/licenses/" 2>/dev/null || true
+fi
 echo "deps ready in $OUT"
-ls -la "$OUT/lib"/*.a
+ls -la "$OUT/lib"/

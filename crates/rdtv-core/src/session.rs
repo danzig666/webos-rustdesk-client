@@ -167,6 +167,9 @@ pub enum SessionEvent {
         peer: PeerSummary,
         route: Route,
         secured: bool,
+        /// Salted hash that logged in, kept in memory only so an automatic reconnect can
+        /// log in again (persisted only through `RememberHash` after the user opted in).
+        session_hash: Option<Vec<u8>>,
     },
     /// Store this salted hash for the profile+peer (user opted in).
     RememberHash(Vec<u8>),
@@ -535,7 +538,8 @@ async fn run(
                                 }
                             }
                             connected = true;
-                            emit(SessionEvent::Connected { peer: summary, route, secured });
+                            let session_hash = login.sent.as_ref().map(|(s, _)| s.clone());
+                            emit(SessionEvent::Connected { peer: summary, route, secured, session_hash });
                             emit(SessionEvent::Phase(Phase::Connected));
                             // Restore the saved monitor when it still exists (visible fallback
                             // to the host's current display otherwise).

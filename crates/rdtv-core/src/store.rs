@@ -92,19 +92,19 @@ pub fn default_shortcuts(mac: bool) -> Vec<Shortcut> {
     };
     if mac {
         vec![
-            s("App switcher (Cmd+Tab)", &["Meta", "Tab"]),
-            s("Force quit (Cmd+Opt+Esc)", &["Meta", "Alt", "Esc"]),
-            s("Show desktop (F11)", &["F11"]),
-            s("Copy (Cmd+C)", &["Meta", "C"]),
-            s("Paste (Cmd+V)", &["Meta", "V"]),
+            s("Cmd+Tab", &["Meta", "Tab"]),
+            s("Force quit", &["Meta", "Alt", "Esc"]),
+            s("Desktop F11", &["F11"]),
+            s("Copy ⌘C", &["Meta", "C"]),
+            s("Paste ⌘V", &["Meta", "V"]),
         ]
     } else {
         vec![
-            s("Switch window (Alt+Tab)", &["Alt", "Tab"]),
-            s("Task Manager (Ctrl+Shift+Esc)", &["Ctrl", "Shift", "Esc"]),
-            s("Show desktop (Win+D)", &["Meta", "D"]),
-            s("Copy (Ctrl+C)", &["Ctrl", "C"]),
-            s("Paste (Ctrl+V)", &["Ctrl", "V"]),
+            s("Alt+Tab", &["Alt", "Tab"]),
+            s("Task Manager", &["Ctrl", "Shift", "Esc"]),
+            s("Desktop Win+D", &["Meta", "D"]),
+            s("Copy Ctrl+C", &["Ctrl", "C"]),
+            s("Paste Ctrl+V", &["Ctrl", "V"]),
         ]
     }
 }
@@ -219,6 +219,8 @@ pub struct State {
     pub settings: AppSettings,
     /// Stable local client ID announced to hosts as `my_id` (not a secret).
     pub client_id: String,
+    /// Stable device UUID (base64) for the account API's `uuid` field.
+    pub client_uuid: String,
 }
 
 impl Default for State {
@@ -230,6 +232,7 @@ impl Default for State {
             data: BTreeMap::new(),
             settings: AppSettings::default(),
             client_id: String::new(),
+            client_uuid: String::new(),
         }
     }
 }
@@ -298,6 +301,10 @@ impl Store {
         }
         if state.client_id.is_empty() {
             state.client_id = generate_client_id();
+        }
+        if state.client_uuid.is_empty() {
+            use hbb_common::base64::{engine::general_purpose::STANDARD, Engine};
+            state.client_uuid = STANDARD.encode(hbb_common::uuid::Uuid::new_v4().as_bytes());
         }
         if state.settings.ui_scale < 0.75 || state.settings.ui_scale > 1.5 {
             state.settings.ui_scale = 1.0;

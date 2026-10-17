@@ -2,6 +2,7 @@
 //! upstream `hbb_common` and `base` crates (RustDesk 1.5.0).
 
 pub mod account;
+pub mod http;
 pub mod input;
 pub mod profile;
 pub mod reconnect;
