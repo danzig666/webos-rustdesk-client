@@ -94,7 +94,10 @@ jobs:
         run: |
           base=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)"/\1/')
           ref="${GITHUB_REF_NAME}"
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${ref#v}"; v="${v%%-*}"; else v="$base"; fi
+          dispatch_tag="${{ github.event.inputs.prerelease_tag }}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${ref#v}"; v="${v%%-*}";
+          elif [[ "$dispatch_tag" == v* ]]; then v="${dispatch_tag#v}"; v="${v%%-*}";
+          else v="$base"; fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "IPK version: $v"
       - name: Build C media libraries + SDL2 webOS backport

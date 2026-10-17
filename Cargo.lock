@@ -2498,7 +2498,7 @@ dependencies = [
 
 [[package]]
 name = "rdtv-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "cc",
@@ -2513,7 +2513,7 @@ dependencies = [
 
 [[package]]
 name = "rdtv-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "base",
@@ -2530,7 +2530,7 @@ dependencies = [
 
 [[package]]
 name = "rdtv-media"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "cc",
