@@ -1,0 +1,182 @@
+//! Physical key positions for RustDesk's "map" keyboard mode.
+//!
+//! In map mode the client sends the host-platform code of the physical key (Windows set-1
+//! scancode with `0xE0xx` for extended keys, Linux X keycode = evdev + 8, macOS virtual
+//! keycode) with real press/release, so modifiers stay held across keys (Alt+Tab cycling,
+//! Shift+arrows, Win+E). Upstream: `src/keyboard.rs` `_map_keyboard_mode` and the server's
+//! `sim_rdev_rawkey_position`. The table is keyed by USB HID usage (page 7), which is what SDL
+//! scancodes are; values follow the USB/evdev/Windows/macOS columns of Chromium's
+//! `keycode_converter_data.inc`.
+
+/// The host platform as reported in `PeerInfo.platform`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostPlatform {
+    Windows,
+    Linux,
+    MacOs,
+}
+
+impl HostPlatform {
+    pub fn from_peer(platform: &str) -> Option<HostPlatform> {
+        match platform {
+            p if p.eq_ignore_ascii_case("Windows") => Some(HostPlatform::Windows),
+            p if p.eq_ignore_ascii_case("Linux") => Some(HostPlatform::Linux),
+            p if p.eq_ignore_ascii_case("Mac OS") || p.eq_ignore_ascii_case("macOS") => {
+                Some(HostPlatform::MacOs)
+            }
+            _ => None,
+        }
+    }
+}
+
+/// (USB HID usage, evdev code, Windows scancode, macOS keycode). macOS 0xffff = none.
+const TABLE: &[(u16, u16, u16, u16)] = &[
+    (0x04, 30, 0x1e, 0x00), // A
+    (0x05, 48, 0x30, 0x0b),
+    (0x06, 46, 0x2e, 0x08),
+    (0x07, 32, 0x20, 0x02),
+    (0x08, 18, 0x12, 0x0e),
+    (0x09, 33, 0x21, 0x03),
+    (0x0a, 34, 0x22, 0x05),
+    (0x0b, 35, 0x23, 0x04),
+    (0x0c, 23, 0x17, 0x22),
+    (0x0d, 36, 0x24, 0x26),
+    (0x0e, 37, 0x25, 0x28),
+    (0x0f, 38, 0x26, 0x25),
+    (0x10, 50, 0x32, 0x2e),
+    (0x11, 49, 0x31, 0x2d),
+    (0x12, 24, 0x18, 0x1f),
+    (0x13, 25, 0x19, 0x23),
+    (0x14, 16, 0x10, 0x0c),
+    (0x15, 19, 0x13, 0x0f),
+    (0x16, 31, 0x1f, 0x01),
+    (0x17, 20, 0x14, 0x11),
+    (0x18, 22, 0x16, 0x20),
+    (0x19, 47, 0x2f, 0x09),
+    (0x1a, 17, 0x11, 0x0d),
+    (0x1b, 45, 0x2d, 0x07),
+    (0x1c, 21, 0x15, 0x10),
+    (0x1d, 44, 0x2c, 0x06), // Z
+    (0x1e, 2, 0x02, 0x12),  // 1
+    (0x1f, 3, 0x03, 0x13),
+    (0x20, 4, 0x04, 0x14),
+    (0x21, 5, 0x05, 0x15),
+    (0x22, 6, 0x06, 0x17),
+    (0x23, 7, 0x07, 0x16),
+    (0x24, 8, 0x08, 0x1a),
+    (0x25, 9, 0x09, 0x1c),
+    (0x26, 10, 0x0a, 0x19),
+    (0x27, 11, 0x0b, 0x1d), // 0
+    (0x28, 28, 0x1c, 0x24), // Enter
+    (0x29, 1, 0x01, 0x35),  // Escape
+    (0x2a, 14, 0x0e, 0x33), // Backspace
+    (0x2b, 15, 0x0f, 0x30), // Tab
+    (0x2c, 57, 0x39, 0x31), // Space
+    (0x2d, 12, 0x0c, 0x1b), // -
+    (0x2e, 13, 0x0d, 0x18), // =
+    (0x2f, 26, 0x1a, 0x21), // [
+    (0x30, 27, 0x1b, 0x1e), // ]
+    (0x31, 43, 0x2b, 0x2a), // backslash
+    (0x32, 43, 0x2b, 0x2a), // non-US #
+    (0x33, 39, 0x27, 0x29), // ;
+    (0x34, 40, 0x28, 0x27), // '
+    (0x35, 41, 0x29, 0x32), // `
+    (0x36, 51, 0x33, 0x2b), // ,
+    (0x37, 52, 0x34, 0x2f), // .
+    (0x38, 53, 0x35, 0x2c), // /
+    (0x39, 58, 0x3a, 0x39), // Caps Lock
+    (0x3a, 59, 0x3b, 0x7a), // F1
+    (0x3b, 60, 0x3c, 0x78),
+    (0x3c, 61, 0x3d, 0x63),
+    (0x3d, 62, 0x3e, 0x76),
+    (0x3e, 63, 0x3f, 0x60),
+    (0x3f, 64, 0x40, 0x61),
+    (0x40, 65, 0x41, 0x62),
+    (0x41, 66, 0x42, 0x64),
+    (0x42, 67, 0x43, 0x65),
+    (0x43, 68, 0x44, 0x6d),    // F10
+    (0x44, 87, 0x57, 0x67),    // F11
+    (0x45, 88, 0x58, 0x6f),    // F12
+    (0x46, 99, 0xe037, 0x69),  // Print Screen
+    (0x47, 70, 0x46, 0x6b),    // Scroll Lock
+    (0x49, 110, 0xe052, 0x72), // Insert
+    (0x4a, 102, 0xe047, 0x73), // Home
+    (0x4b, 104, 0xe049, 0x74), // Page Up
+    (0x4c, 111, 0xe053, 0x75), // Delete
+    (0x4d, 107, 0xe04f, 0x77), // End
+    (0x4e, 109, 0xe051, 0x79), // Page Down
+    (0x4f, 106, 0xe04d, 0x7c), // Right
+    (0x50, 105, 0xe04b, 0x7b), // Left
+    (0x51, 108, 0xe050, 0x7d), // Down
+    (0x52, 103, 0xe048, 0x7e), // Up
+    (0x53, 69, 0x45, 0x47),    // Num Lock
+    (0x54, 98, 0xe035, 0x4b),  // KP /
+    (0x55, 55, 0x37, 0x43),    // KP *
+    (0x56, 74, 0x4a, 0x4e),    // KP -
+    (0x57, 78, 0x4e, 0x45),    // KP +
+    (0x58, 96, 0xe01c, 0x4c),  // KP Enter
+    (0x59, 79, 0x4f, 0x53),    // KP 1
+    (0x5a, 80, 0x50, 0x54),
+    (0x5b, 81, 0x51, 0x55),
+    (0x5c, 75, 0x4b, 0x56),
+    (0x5d, 76, 0x4c, 0x57),
+    (0x5e, 77, 0x4d, 0x58),
+    (0x5f, 71, 0x47, 0x59),
+    (0x60, 72, 0x48, 0x5b),
+    (0x61, 73, 0x49, 0x5c),    // KP 9
+    (0x62, 82, 0x52, 0x52),    // KP 0
+    (0x63, 83, 0x53, 0x41),    // KP .
+    (0x64, 86, 0x56, 0x0a),    // non-US backslash (ISO <>)
+    (0x65, 127, 0xe05d, 0x6e), // Menu
+    (0xe0, 29, 0x1d, 0x3b),    // Left Ctrl
+    (0xe1, 42, 0x2a, 0x38),    // Left Shift
+    (0xe2, 56, 0x38, 0x3a),    // Left Alt
+    (0xe3, 125, 0xe05b, 0x37), // Left Win/Cmd
+    (0xe4, 97, 0xe01d, 0x3e),  // Right Ctrl
+    (0xe5, 54, 0x36, 0x3c),    // Right Shift
+    (0xe6, 100, 0xe038, 0x3d), // Right Alt / AltGr
+    (0xe7, 126, 0xe05c, 0x36), // Right Win/Cmd
+];
+
+/// Host code for the key at USB HID usage `usb` (= SDL scancode), if known.
+pub fn map_code(usb: i32, host: HostPlatform) -> Option<u32> {
+    let usb = u16::try_from(usb).ok()?;
+    let &(_, evdev, win, mac) = TABLE.iter().find(|e| e.0 == usb)?;
+    Some(match host {
+        HostPlatform::Windows => win as u32,
+        HostPlatform::Linux => evdev as u32 + 8,
+        HostPlatform::MacOs if mac != 0xffff => mac as u32,
+        HostPlatform::MacOs => return None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn alt_tab_codes() {
+        assert_eq!(map_code(0xe2, HostPlatform::Windows), Some(0x38));
+        assert_eq!(map_code(0x2b, HostPlatform::Windows), Some(0x0f));
+        assert_eq!(map_code(0x2b, HostPlatform::Linux), Some(23));
+        assert_eq!(map_code(0x2b, HostPlatform::MacOs), Some(0x30));
+        assert_eq!(map_code(0x50, HostPlatform::Windows), Some(0xe04b));
+        assert_eq!(map_code(0x3a, HostPlatform::Windows), Some(0x3b)); // F1
+        assert_eq!(map_code(0x48, HostPlatform::Windows), None); // Pause: no scancode
+    }
+
+    #[test]
+    fn table_has_no_duplicate_usages() {
+        let mut seen = std::collections::BTreeSet::new();
+        for e in TABLE {
+            assert!(seen.insert(e.0), "duplicate usage 0x{:x}", e.0);
+        }
+    }
+
+    #[test]
+    fn platforms() {
+        assert_eq!(HostPlatform::from_peer("Windows"), Some(HostPlatform::Windows));
+        assert_eq!(HostPlatform::from_peer("Mac OS"), Some(HostPlatform::MacOs));
+        assert_eq!(HostPlatform::from_peer("Android"), None);
+    }
+}

@@ -50,7 +50,7 @@ empty and wait for someone at the computer to click Accept.
 | Arrow buttons | Mouse mode: move the mouse (hold to accelerate); OK clicks. Arrow mode: arrow keys, OK = Enter |
 | CH + / CH − | Scroll up / down |
 | Number buttons 0–9 | Type digits on the computer (and digits into the password/code dialogs) |
-| USB/Bluetooth keyboard | Types on the computer; **Ctrl+Alt+Shift+Space** opens the toolbar. The TV reports the keyboard's **Esc** as the remote's Back, so for 10 s after you type, Back/Esc is sent to the computer as Esc; after that Back opens the toolbar again |
+| USB/Bluetooth keyboard | Types on the computer; **Ctrl+Alt+Shift+Space** opens the toolbar. The TV reports the keyboard's **Esc** as the remote's Back, so for 10 s after you type, Back/Esc is sent to the computer as Esc; after that Back opens the toolbar again. Shortcuts (Alt+Tab, Win+E, Ctrl+C, Shift+arrows) and special keys are sent as physical keys, so modifiers stay held. The TV keeps some function keys for itself (on an LG C3: F2, F11, F12 control TV functions); use the on-screen keyboard's **More** page for those |
 
 No colour buttons? Everything is also in the **toolbar** (press Back): Keyboard, Monitor, Mouse/Arrows,
 View, Keys, Mute, Quality, Info, Disconnect.

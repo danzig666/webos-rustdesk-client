@@ -116,6 +116,18 @@ pub fn control_key(key: ControlKey, down: bool, press: bool, mods: Mods) -> Mess
     msg
 }
 
+/// A physical key in map mode: `code` is the host-platform key code (see `keymap`), with real
+/// press/release so held modifiers stay held on the host.
+pub fn map_key(code: u32, down: bool) -> Message {
+    let mut ev = KeyEvent::new();
+    ev.set_chr(code);
+    ev.down = down;
+    ev.mode = KeyboardMode::Map.into();
+    let mut msg = Message::new();
+    msg.set_key_event(ev);
+    msg
+}
+
 /// A character key carrying hotkey modifiers (e.g. Ctrl+C). `c` should be the unshifted
 /// base character as it appears on a US keyboard.
 pub fn chr_key(c: char, down: bool, press: bool, mods: Mods) -> Message {
@@ -276,6 +288,7 @@ pub fn chord_messages(chord: &Chord) -> Vec<Message> {
 pub struct HeldInput {
     buttons: BTreeSet<MouseButton>,
     keys: BTreeSet<i32>,
+    map_keys: BTreeSet<u32>,
     last_pos: (i32, i32),
 }
 
@@ -301,12 +314,20 @@ impl HeldInput {
         }
     }
 
+    pub fn note_map_key(&mut self, code: u32, down: bool) {
+        if down {
+            self.map_keys.insert(code);
+        } else {
+            self.map_keys.remove(&code);
+        }
+    }
+
     pub fn is_button_down(&self, b: MouseButton) -> bool {
         self.buttons.contains(&b)
     }
 
     pub fn anything_held(&self) -> bool {
-        !self.buttons.is_empty() || !self.keys.is_empty()
+        !self.buttons.is_empty() || !self.keys.is_empty() || !self.map_keys.is_empty()
     }
 
     /// Release messages for everything held, and clear the state.
@@ -322,8 +343,12 @@ impl HeldInput {
                 out.push(control_key(ck, false, false, Mods::default()));
             }
         }
+        for c in self.map_keys.iter() {
+            out.push(map_key(*c, false));
+        }
         self.buttons.clear();
         self.keys.clear();
+        self.map_keys.clear();
         out
     }
 
@@ -331,6 +356,7 @@ impl HeldInput {
     pub fn clear(&mut self) {
         self.buttons.clear();
         self.keys.clear();
+        self.map_keys.clear();
     }
 }
 

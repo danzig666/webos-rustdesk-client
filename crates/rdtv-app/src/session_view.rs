@@ -18,6 +18,7 @@ use crate::{
 };
 use rdtv_core::{
     input::{self, HeldInput, Mods, MouseButton},
+    keymap::{self, HostPlatform},
     message_proto::{AudioFormat, AudioFrame, ControlKey, VideoFrame},
     session::{
         self, DecodeCaps, DisplayDesc, MediaSink, PeerSummary, SessionCommand, SessionEvent, SessionHandle,
@@ -860,7 +861,13 @@ impl ActiveSession {
                         if down {
                             self.keyboard_active_until = Some(Instant::now() + KEYBOARD_ACTIVE);
                         }
-                        self.physical_key(Keycode::Escape, &KeyMods::default(), down, repeat);
+                        self.physical_key(
+                            Keycode::Escape,
+                            Some(sdl2::keyboard::Scancode::Escape),
+                            &KeyMods::default(),
+                            down,
+                            repeat,
+                        );
                         return true;
                     }
                     if down && !repeat {
@@ -1095,10 +1102,10 @@ impl ActiveSession {
             }
             In::Key {
                 key,
+                scancode,
                 mods,
                 down,
                 repeat,
-                ..
             } => {
                 // Remote number buttons look like keyboard digits; they must not flip the
                 // D-pad into keyboard-arrow mode.
@@ -1108,7 +1115,7 @@ impl ActiveSession {
                 if self.menu != Menu::None {
                     return false;
                 }
-                self.physical_key(*key, mods, *down, *repeat);
+                self.physical_key(*key, *scancode, mods, *down, *repeat);
                 true
             }
             In::Text(_) => true,
@@ -1116,7 +1123,49 @@ impl ActiveSession {
         }
     }
 
-    fn physical_key(&mut self, key: Keycode, mods: &KeyMods, down: bool, repeat: bool) {
+    /// Host code of a physical key in map mode, when the host platform is known.
+    fn map_code(&self, scancode: Option<sdl2::keyboard::Scancode>) -> Option<u32> {
+        let host = HostPlatform::from_peer(&self.peer.as_ref()?.platform)?;
+        keymap::map_code(scancode? as i32, host)
+    }
+
+    fn send_map_key(&mut self, code: u32, down: bool) {
+        self.held.note_map_key(code, down);
+        self.send(input::map_key(code, down));
+    }
+
+    fn physical_key(
+        &mut self,
+        key: Keycode,
+        scancode: Option<sdl2::keyboard::Scancode>,
+        mods: &KeyMods,
+        down: bool,
+        repeat: bool,
+    ) {
+        // Map mode (physical key positions with real press/release, as the RustDesk desktop
+        // client sends) for modifiers, shortcuts and non-text keys: the host then holds Alt
+        // across Tab presses, Shift across arrows, etc. Plain typing stays text so it comes
+        // out right whatever layout the host uses; AltGr (Hungarian symbols) stays on the
+        // legacy path, which types the resulting character.
+        if let Some(code) = self.map_code(scancode) {
+            let is_mod = matches!(
+                key,
+                Keycode::LCtrl
+                    | Keycode::RCtrl
+                    | Keycode::LShift
+                    | Keycode::RShift
+                    | Keycode::LAlt
+                    | Keycode::LGui
+                    | Keycode::RGui
+            );
+            let hotkey = mods.ctrl || mods.alt || mods.gui;
+            let text = !hotkey && keycode_char(key, mods).is_some();
+            if is_mod || (!text && !mods.altgr) {
+                self.win_alone = false;
+                self.send_map_key(code, down);
+                return;
+            }
+        }
         let m = Mods {
             ctrl: mods.ctrl,
             alt: mods.alt,
