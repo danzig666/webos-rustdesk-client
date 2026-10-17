@@ -171,6 +171,43 @@ fn key_abi() -> KeyAbi {
     *KEY_ABI.get().unwrap_or(&KeyAbi::Upstream)
 }
 
+/// The last few raw key events, shown in Diagnostics so a keyboard's behaviour on a real TV
+/// (which keys arrive, with which codes and modifiers) can be reported.
+static KEY_LOG: std::sync::Mutex<std::collections::VecDeque<String>> =
+    std::sync::Mutex::new(std::collections::VecDeque::new());
+const KEY_LOG_LEN: usize = 10;
+
+fn log_key(k: &RawKey) {
+    if k.repeat {
+        return;
+    }
+    let name = Keycode::from_i32(k.sym)
+        .map(|c| c.name())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| format!("sym {}", k.sym));
+    let line = format!(
+        "{}{} sc{} m{:x}",
+        if k.down { "+" } else { "-" },
+        name,
+        k.scancode,
+        k.modstate
+    );
+    if let Ok(mut l) = KEY_LOG.lock() {
+        if l.len() >= KEY_LOG_LEN {
+            l.pop_front();
+        }
+        l.push_back(line);
+    }
+}
+
+/// Recent raw key events, oldest first.
+pub fn recent_keys() -> Vec<String> {
+    KEY_LOG
+        .lock()
+        .map(|l| l.iter().cloned().collect())
+        .unwrap_or_default()
+}
+
 struct RawKey {
     down: bool,
     repeat: bool,
@@ -213,6 +250,7 @@ pub fn poll(out: &mut Vec<In>) {
         if ty == T::SDL_KEYDOWN as u32 || ty == T::SDL_KEYUP as u32 {
             let k = decode_key(&raw, ty == T::SDL_KEYDOWN as u32);
             log::trace!("key sc={} sym={} down={}", k.scancode, k.sym, k.down);
+            log_key(&k);
             if let Some(r) = webos_remote_from_scancode(k.scancode) {
                 out.push(In::Remote {
                     key: r,
@@ -254,6 +292,17 @@ fn translate_key(
         Keycode::Left => Some(Remote::Left),
         Keycode::Right => Some(Remote::Right),
         Keycode::Return | Keycode::KpEnter => Some(Remote::Ok),
+        // The remote's Back button has its own webOS scancode (handled before this); on the
+        // TV an AC Back key comes from a keyboard's Esc, which belongs to the computer.
+        Keycode::AcBack if is_webos() => {
+            return out.push(In::Key {
+                key: Keycode::Escape,
+                scancode: Some(Scancode::Escape),
+                mods: KeyMods::from_sdl(keymod),
+                down,
+                repeat,
+            })
+        }
         Keycode::AcBack => Some(Remote::Back),
         _ if !is_webos() => match key {
             Keycode::F1 => Some(Remote::Red),

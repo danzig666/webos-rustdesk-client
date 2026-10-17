@@ -1,4 +1,4 @@
-## RemoteDesk TV: test build
+## RemoteDesk TV
 
 Community RustDesk-compatible remote desktop client for LG webOS TVs (webOS 5.x and newer). It
 connects **out** to a computer running the normal RustDesk app (protocol baseline RustDesk 1.5.0).
@@ -26,11 +26,7 @@ CI (cross-compile, ELF/ABI audit, emulated self-test, IPK verification). Please 
 
 ### Files
 
-* `io.github.danzig666.remotedesktv_<ver>_arm.ipk`: the app.
-* `SHA256SUMS.txt`: checksum.
-* `*.manifest.json`: Homebrew repository manifest.
-* `sbom.cdx.json`, `THIRD-PARTY-NOTICES.txt`: software bill of materials and notices.
-* `elf-audit.txt`, `smoke-test.txt`, `ipk-verify.md`: build checks.
+* `io.github.danzig666.remotedesktv_<ver>_arm.ipk`: the app (licences and third-party notices are inside).
 * `remotedesk-tv-<ver>-source.tar.gz`: complete corresponding source (AGPL-3.0), including the pinned RustDesk submodule.
 
 Not affiliated with or endorsed by RustDesk or LG.

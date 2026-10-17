@@ -55,8 +55,7 @@ cargo test -p rdtv-core -p rdtv-media -p rdtv-app
 
 ## Releases
 
-* Push a tag `vX.Y.Z` (or `vX.Y.Z-test.N`). The workflow builds and publishes a **pre-release** with
-  the IPK, `SHA256SUMS.txt`, SBOM, notices, ELF audit, smoke test output, Homebrew manifest and the
-  complete source archive (with submodules).
-* Or run the workflow manually with `prerelease_tag`.
+* Push a tag `vX.Y.Z`, or run the workflow manually with `release_tag`. The release carries only
+  the IPK (licences and notices inside) and the complete source archive (with submodules). The
+  SBOM, checksums, ELF audit, smoke test output and Homebrew manifest stay in the workflow artifact.
 * The webOS package version is the numeric `X.Y.Z` part of the tag.

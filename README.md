@@ -6,10 +6,9 @@ sofa with the Magic Remote, a regular remote, or a USB/Bluetooth mouse and keybo
 
 <img src="packaging/webos/icon_512.png" width="96" alt="RemoteDesk TV icon">
 
-> **Status: experimental test builds.** The client works end to end against a stock RustDesk 1.5.0
-> host, tested from a desktop build and from the ARM TV build under emulation. It has **not run on a
-> TV yet**. TV launch, remote keys, audio, hardware decoding and Developer Mode need hardware
-> verification: see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) and
+> **Status:** tested on an **LG C3** with a Windows RustDesk host: connecting, Magic Remote, remote
+> buttons, hardware video, keyboard shrink and zoom work. Other models, webOS versions and Developer
+> Mode installs still need reports: see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) and
 > [docs/NONROOT_CHECKLIST.md](docs/NONROOT_CHECKLIST.md).
 
 Not affiliated with or endorsed by RustDesk or LG.

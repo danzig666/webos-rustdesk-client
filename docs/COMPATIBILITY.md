@@ -1,7 +1,8 @@
 # Compatibility report
 
-**Status: experimental test builds. No TV has run this application yet.** Everything below is
-labelled with what it actually rests on.
+**Status: tested by the owner on an LG C3** (connecting, Magic Remote, remote buttons, hardware
+video, keyboard shrink, zoom), with a Windows RustDesk host. Everything below is labelled with what
+it actually rests on.
 
 ## Tested combinations
 
@@ -63,4 +64,4 @@ A stable (non-pre-release) build needs real evidence for:
 4. Lifecycle: default disconnect + Reconnect, keep-in-background, 30 s reconnect.
 5. A webOS 5.x launch + decoder probe, or webOS 5 declared unverified in the release notes.
 
-Until then every GitHub release is a **pre-release / test build**.
+These gates are tracked here; releases are no longer marked as pre-releases (D25).

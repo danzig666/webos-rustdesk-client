@@ -982,6 +982,15 @@ pub fn diagnostics_text(app: &App) -> String {
             "off"
         }
     ));
+    let keys = crate::keys::recent_keys();
+    s.push_str(&format!(
+        "Last keys (+ press, - release; newest last): {}\n",
+        if keys.is_empty() {
+            "none yet".to_owned()
+        } else {
+            keys.join("  ")
+        }
+    ));
     s.push_str(&format!(
         "Hardware picture placement: {}\n",
         if !app.store.state.settings.hw_picture_placement {

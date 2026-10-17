@@ -1145,6 +1145,14 @@ impl ActiveSession {
             }
         }
         match physical_to_remote(key, mods) {
+            // Shortcuts (Alt+Tab, Ctrl+Esc, Win+E…) go as one press carrying the modifiers,
+            // the way the on-screen keyboard sends them; separate down/up events made the
+            // host release the modifier between them.
+            Some(RemoteKey::Control(ck)) if m.any_hotkey() => {
+                if down {
+                    self.send(input::control_key(ck, true, true, m));
+                }
+            }
             Some(RemoteKey::Control(ck)) => {
                 if repeat && down {
                     self.send(input::control_key(ck, true, false, m));
