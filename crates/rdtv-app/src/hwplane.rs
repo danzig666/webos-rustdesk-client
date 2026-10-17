@@ -24,14 +24,16 @@ pub struct SdlRect {
 type CreateFn = unsafe extern "C" fn(c_int) -> *const c_char;
 type SetFn = unsafe extern "C" fn(*const c_char, *mut SdlRect, *mut SdlRect) -> c_int;
 type DestroyFn = unsafe extern "C" fn(*const c_char);
+type CropFn = unsafe extern "C" fn(*const c_char, *mut SdlRect, *mut SdlRect, *mut SdlRect) -> c_int;
 
 const EXPORTED_WINDOW_TYPE_VIDEO: c_int = 0;
 
 pub struct HwPlane {
     id: CString,
     set: SetFn,
+    crop: Option<CropFn>,
     destroy: DestroyFn,
-    last: Option<(SdlRect, SdlRect)>,
+    last: Option<(SdlRect, SdlRect, SdlRect)>,
     generation: u64,
     pub failures: u32,
 }
@@ -63,6 +65,8 @@ impl HwPlane {
         Ok(HwPlane {
             id,
             set: unsafe { std::mem::transmute_copy(&set) },
+            crop: sym(c"SDL_webOSExportedSetCropRegion")
+                .map(|p| unsafe { std::mem::transmute_copy::<*mut c_void, CropFn>(&p) }),
             destroy: unsafe { std::mem::transmute_copy(&destroy) },
             last: None,
             generation: 0,
@@ -74,18 +78,38 @@ impl HwPlane {
         self.id.to_str().unwrap_or("")
     }
 
-    /// Show source crop `src` (stream pixels) at `dst` (window pixels). Cheap when unchanged.
-    pub fn place(&mut self, mut src: SdlRect, mut dst: SdlRect) -> bool {
-        if self.last == Some((src, dst)) {
+    /// Whether part of the picture can be shown (zoom, 1:1 larger than the screen).
+    pub fn can_crop(&self) -> bool {
+        self.crop.is_some()
+    }
+
+    /// Show source crop `src` (stream pixels, within `org` = the whole stream) at `dst`
+    /// (window pixels). `SDL_webOSSetExportedWindow` only moves/scales the whole picture; a
+    /// partial source needs `SDL_webOSExportedSetCropRegion`. Cheap when unchanged.
+    pub fn place(&mut self, org: SdlRect, src: SdlRect, dst: SdlRect) -> bool {
+        if self.last == Some((org, src, dst)) {
             return true;
         }
-        let ok = unsafe { (self.set)(self.id.as_ptr(), &mut src, &mut dst) } != 0;
+        let (mut o, mut s, mut d) = (org, src, dst);
+        let ok = unsafe { (self.set)(self.id.as_ptr(), &mut o, &mut d) } != 0;
+        if ok && src != org {
+            if let Some(crop) = self.crop {
+                let (mut o, mut d) = (org, dst);
+                if unsafe { crop(self.id.as_ptr(), &mut o, &mut s, &mut d) } == 0 {
+                    // Cropping refused: keep whole-picture placement, give up zoom/1:1.
+                    log::warn!("SDL_webOSExportedSetCropRegion failed: {}", sdl_error());
+                    self.crop = None;
+                    self.last = None;
+                    return true;
+                }
+            }
+        }
         if ok {
-            self.last = Some((src, dst));
+            self.last = Some((org, src, dst));
         } else {
             self.failures += 1;
             if self.failures <= 3 {
-                log::warn!("SDL_webOSSetExportedWindow failed: {}", sdl_error());
+                log::warn!("exported window placement failed: {}", sdl_error());
             }
         }
         ok

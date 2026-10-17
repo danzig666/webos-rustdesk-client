@@ -990,9 +990,10 @@ pub fn diagnostics_text(app: &App) -> String {
             format!("unavailable ({e})")
         } else if let Some(p) = &app.hwplane {
             format!(
-                "exported window {} · {}",
+                "exported window {} · {} · zoom/1:1 crop: {}",
                 p.id(),
-                rdtv_media::ndl::window_status()
+                rdtv_media::ndl::window_status(),
+                if p.can_crop() { "available" } else { "not available" }
             )
         } else {
             "not started yet".to_owned()

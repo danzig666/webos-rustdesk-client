@@ -149,6 +149,8 @@ pub struct ActiveSession {
     px_per_logical: f32,
     /// Hardware picture placement active (exported window bound to the decoder).
     pub placement: bool,
+    /// The placed hardware picture can also be cropped (zoom, 1:1).
+    pub crop: bool,
 }
 
 pub fn keycode_char(key: Keycode, mods: &KeyMods) -> Option<char> {
@@ -316,6 +318,7 @@ impl ActiveSession {
             uac: false,
             px_per_logical: 1.0,
             placement: false,
+            crop: false,
         }
     }
 
@@ -602,6 +605,11 @@ impl ActiveSession {
         self.hardware() && !self.placement
     }
 
+    /// Hardware picture that can only be shown whole (Fit), never cropped.
+    fn hw_fit_only(&self) -> bool {
+        self.hardware() && !(self.placement && self.crop)
+    }
+
     fn stream_size(&self) -> (f32, f32) {
         if let Some((_, w, h)) = &self.video_tex {
             return (*w as f32, *h as f32);
@@ -627,7 +635,7 @@ impl ActiveSession {
             RectF::new(0.0, 0.0, W as f32, H as f32)
         };
         let (sw, sh) = self.stream_size();
-        let st = if self.hw_fullscreen() {
+        let st = if self.hw_fit_only() {
             ViewState::default()
         } else {
             self.view
@@ -738,7 +746,7 @@ impl ActiveSession {
                     self.vmouse.1 + dy.round() as i32,
                 );
                 self.move_to(nx, ny);
-                if self.view.mode != ViewMode::Fit && !self.hw_fullscreen() {
+                if self.view.mode != ViewMode::Fit && !self.hw_fit_only() {
                     let area = RectF::new(0.0, 0.0, W as f32, H as f32);
                     let (px, py) = view::pan_to_include(&self.view, v, area, m, nx, ny);
                     self.view.pan_x = px;
@@ -1182,6 +1190,7 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
     };
     a.px_per_logical = f.g.raster_scale;
     a.placement = app.hwplane.is_some() && rdtv_media::ndl::window_bound();
+    a.crop = app.hwplane.as_ref().is_some_and(|p| p.can_crop());
     if a.placement && a.hardware() {
         if let Some(p) = app.hwplane.as_mut() {
             p.note_generation(rdtv_media::ndl::window_generation());
@@ -1189,7 +1198,15 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
         let v = a.view_rect();
         let stream = a.stream_size();
         let ok = match crate::hwplane::crop_for(v, stream, (W as f32, H as f32), f.g.raster_scale) {
-            Some((src, dst)) => app.hwplane.as_mut().is_some_and(|p| p.place(src, dst)),
+            Some((src, dst)) => {
+                let org = crate::hwplane::SdlRect {
+                    x: 0,
+                    y: 0,
+                    w: stream.0 as i32,
+                    h: stream.1 as i32,
+                };
+                app.hwplane.as_mut().is_some_and(|p| p.place(org, src, dst))
+            }
             None => true,
         };
         if !ok && app.hwplane.as_ref().is_some_and(|p| p.failures >= 3) {
@@ -1475,11 +1492,11 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
         }
         Menu::View => {
             title = "View (local only; the remote resolution never changes)".to_owned();
-            let hw = a.hw_fullscreen();
+            let hw = a.hw_fit_only();
             rows.push(("Fit to screen".into(), Act::View(ViewMode::Fit)));
             if hw {
                 rows.push((
-                    "1:1 and zoom need software decoding (hardware plane is full-screen)".into(),
+                    "1:1 and zoom need software decoding (this TV cannot crop the hardware picture)".into(),
                     Act::Close,
                 ));
             } else {
