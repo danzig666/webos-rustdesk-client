@@ -811,7 +811,7 @@ fn peer_settings(app: &mut App, f: &mut Frame, peer: &str) {
         ),
         (
             "ps-cursor",
-            "Ask host to show its cursor in the video".into(),
+            "Show the computer's mouse cursor".into(),
             String::new(),
             if s.show_remote_cursor { 2 } else { 1 },
         ),

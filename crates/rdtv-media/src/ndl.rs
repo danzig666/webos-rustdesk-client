@@ -188,12 +188,11 @@ fn ensure_init(l: &Lib) -> Result<()> {
 }
 
 /// Exported (punch-through) window the decoded picture should be bound to, if the app
-/// created one. With a bound window the compositor places/scales the hardware picture where
-/// the app says (`SDL_webOSSetExportedWindow`); without one NDL presents full-screen.
-/// Experimental: `NDL_DirectMediaSetWindowId` is declared by webos-userland's API 2 header
-/// but no public project is known to combine it with exported windows.
+/// created one. NDL API 2 cannot use it (`NDL_DirectMediaSetWindowId` left the picture
+/// full-screen on a C3, 0.1.3 test), so only the Starfish backend (`crate::smp`) binds it.
 static TARGET_WINDOW: Mutex<Option<CString>> = Mutex::new(None);
 static WINDOW_BOUND: AtomicBool = AtomicBool::new(false);
+static WINDOW_GEN: AtomicU64 = AtomicU64::new(0);
 static WINDOW_STATUS: Mutex<String> = Mutex::new(String::new());
 
 pub fn set_target_window(id: Option<&str>) {
@@ -204,45 +203,31 @@ pub fn set_target_window(id: Option<&str>) {
     }
 }
 
-/// Whether the current/last decoder load was bound to the app's exported window.
+pub(crate) fn target_window() -> Option<CString> {
+    TARGET_WINDOW.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// Whether the current decoder presents into the app's exported window.
 pub fn window_bound() -> bool {
     WINDOW_BOUND.load(Ordering::SeqCst)
+}
+
+/// Changes on every decoder load: the window placement must be sent again.
+pub fn window_generation() -> u64 {
+    WINDOW_GEN.load(Ordering::SeqCst)
 }
 
 pub fn window_status() -> String {
     WINDOW_STATUS.lock().map(|s| s.clone()).unwrap_or_default()
 }
 
-fn set_status(s: String) {
-    log::info!("NDL window binding: {s}");
+pub(crate) fn set_window_state(bound: bool, status: String) {
+    log::info!("hardware picture window: {status}");
+    WINDOW_BOUND.store(bound, Ordering::SeqCst);
+    WINDOW_GEN.fetch_add(1, Ordering::SeqCst);
     if let Ok(mut g) = WINDOW_STATUS.lock() {
-        *g = s;
+        *g = status;
     }
-}
-
-/// Bind the next load to the target window (call with the FFI lock held, after init).
-fn bind_window() {
-    let target = TARGET_WINDOW.lock().unwrap_or_else(|e| e.into_inner()).clone();
-    let Some(id) = target else {
-        WINDOW_BOUND.store(false, Ordering::SeqCst);
-        return;
-    };
-    type SetWindowId = unsafe extern "C" fn(*const c_char) -> c_int;
-    let p = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"NDL_DirectMediaSetWindowId".as_ptr()) };
-    if p.is_null() {
-        WINDOW_BOUND.store(false, Ordering::SeqCst);
-        set_status("NDL_DirectMediaSetWindowId not present on this firmware (full-screen)".into());
-        return;
-    }
-    let f: SetWindowId = unsafe { std::mem::transmute_copy(&p) };
-    let rc = unsafe { f(id.as_ptr()) };
-    let ok = rc == 0;
-    WINDOW_BOUND.store(ok, Ordering::SeqCst);
-    set_status(if ok {
-        format!("bound to exported window {}", id.to_string_lossy())
-    } else {
-        format!("NDL_DirectMediaSetWindowId failed ({rc}); full-screen")
-    });
 }
 
 /// Release the process-wide NDL instance (on app exit / background release).
@@ -280,7 +265,6 @@ impl NdlPlayer {
         }
         let _g = FFI.lock().unwrap_or_else(|e| e.into_inner());
         ensure_init(l)?;
-        bind_window();
         let mut info = DataInfo {
             video: VideoInfo {
                 width,

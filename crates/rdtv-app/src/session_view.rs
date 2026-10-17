@@ -119,7 +119,7 @@ pub struct ActiveSession {
     pub presenting: Option<(Codec, bool, i32, i32)>,
     cursors: HashMap<u64, CursorTex>,
     cursor_id: u64,
-    pending_cursor: Option<session::CursorImage>,
+    pending_cursors: Vec<session::CursorImage>,
     remote_cursor: Option<(i32, i32)>,
     pub settings: PeerSettings,
     pub view: ViewState,
@@ -287,7 +287,7 @@ impl ActiveSession {
             presenting: None,
             cursors: HashMap::new(),
             cursor_id: 0,
-            pending_cursor: None,
+            pending_cursors: Vec::new(),
             remote_cursor: None,
             settings,
             view,
@@ -434,7 +434,7 @@ impl ActiveSession {
                     self.cursors.clear();
                 }
                 // Texture creation happens lazily at draw time (needs the texture creator).
-                self.pending_cursor = Some(c);
+                self.pending_cursors.push(c);
             }
             SessionEvent::CursorId(i) => self.cursor_id = i,
             SessionEvent::CursorPosition { x, y } => self.remote_cursor = Some((x, y)),
@@ -667,6 +667,7 @@ impl ActiveSession {
 
     fn move_to(&mut self, x: i32, y: i32) {
         self.vmouse = (x, y);
+        self.remote_cursor = Some((x, y));
         self.held.note_pos(x, y);
         if (x, y) != self.last_move_sent {
             self.last_move_sent = (x, y);
@@ -706,7 +707,6 @@ impl ActiveSession {
                 let (x, y) = p.host;
                 self.move_to(x, y);
                 self.click(MouseButton::Right);
-                self.banner = Some(("Right click".into(), Instant::now()));
             }
         }
         if self.toolbar
@@ -1150,7 +1150,7 @@ impl ActiveSession {
     }
 
     fn upload_cursor(&mut self, g: &mut Gfx) {
-        if let Some(c) = self.pending_cursor.take() {
+        for c in std::mem::take(&mut self.pending_cursors) {
             if let Ok(mut t) = g.texture_creator().create_texture_static(
                 PixelFormatEnum::ABGR8888,
                 c.width as u32,
@@ -1183,6 +1183,9 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
     a.px_per_logical = f.g.raster_scale;
     a.placement = app.hwplane.is_some() && rdtv_media::ndl::window_bound();
     if a.placement && a.hardware() {
+        if let Some(p) = app.hwplane.as_mut() {
+            p.note_generation(rdtv_media::ndl::window_generation());
+        }
         let v = a.view_rect();
         let stream = a.stream_size();
         let ok = match crate::hwplane::crop_for(v, stream, (W as f32, H as f32), f.g.raster_scale) {
@@ -1201,7 +1204,23 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
     if hw {
         // The decoded picture is on the hardware plane below: punch through.
         f.g.canvas.set_blend_mode(sdl2::render::BlendMode::None);
-        f.g.clear(Color::RGBA(0, 0, 0, 0));
+        if a.placement {
+            // Placed picture: opaque black around it, transparent only over it.
+            f.g.clear(Color::RGB(0, 0, 0));
+            let v = a.view_rect();
+            let x0 = v.x.max(0.0);
+            let y0 = v.y.max(0.0);
+            let x1 = (v.x + v.w).min(W as f32);
+            let y1 = (v.y + v.h).min(H as f32);
+            if x1 > x0 && y1 > y0 {
+                f.g.fill(
+                    Rect::new(x0 as i32, y0 as i32, (x1 - x0) as u32, (y1 - y0) as u32),
+                    Color::RGBA(0, 0, 0, 0),
+                );
+            }
+        } else {
+            f.g.clear(Color::RGBA(0, 0, 0, 0));
+        }
         f.g.canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
     } else {
         f.g.clear(Color::RGB(0, 0, 0));
@@ -1222,7 +1241,22 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
     let pointer_recent = a
         .last_pointer
         .is_some_and(|t| t.elapsed() < Duration::from_secs(3));
-    if a.settings.dpad_mode == DpadMode::Mouse && !pointer_recent && a.osk.is_none() {
+    if a.settings.show_remote_cursor {
+        // The host does not draw its cursor into the video; draw it where the host says it is.
+        let v = a.view_rect();
+        if let (Some(m), Some(c)) = (a.monitor(), a.cursors.get(&a.cursor_id)) {
+            let (hx, hy) = a.remote_cursor.unwrap_or(a.vmouse);
+            let (ux, uy) = view::from_host(v, m, hx, hy);
+            let scale = (v.w / m.w as f32).clamp(0.5, 2.0);
+            let dst = Rect::new(
+                (ux - c.hotx as f32 * scale) as i32,
+                (uy - c.hoty as f32 * scale) as i32,
+                ((c.w as f32 * scale) as u32).max(1),
+                ((c.h as f32 * scale) as u32).max(1),
+            );
+            let _ = f.g.canvas.copy(&c.tex, None, dst);
+        }
+    } else if a.settings.dpad_mode == DpadMode::Mouse && !pointer_recent && a.osk.is_none() {
         let v = a.view_rect();
         if let (Some(m), Some(c)) = (a.monitor(), a.cursors.get(&a.cursor_id)) {
             let (ux, uy) = view::from_host(v, m, a.vmouse.0, a.vmouse.1);
@@ -1288,19 +1322,6 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
         let acts = o.draw(f);
         a.osk = Some(o);
         a.osk_actions(acts, &mut app.store);
-    }
-    let Some(a) = app.active.as_ref() else { return };
-    // Persistent tiny status chip when the toolbar is hidden.
-    if !a.toolbar && a.osk.is_none() {
-        let mode = match a.settings.dpad_mode {
-            DpadMode::Mouse => "Mouse",
-            DpadMode::Arrows => "Arrows",
-        };
-        let txt = format!("{mode} · Back: menu");
-        let w = f.g.text_width(&txt, size::SMALL, false) + 30;
-        let r = Rect::new(W - w - 20, 16, w as u32, 40);
-        f.g.round(r, 20, Color::RGBA(10, 18, 34, 150));
-        f.g.text_centered(&txt, r, size::SMALL, false, Color::RGBA(236, 241, 250, 200));
     }
 }
 

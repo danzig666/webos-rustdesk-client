@@ -354,7 +354,7 @@ impl App {
         });
     }
 
-    /// Create (once) or drop the exported video window, and tell NDL to bind to it.
+    /// Create (once) or drop the exported video window the Starfish decoder presents into.
     fn prepare_hwplane(&mut self) {
         let s = &self.store.state.settings;
         let wanted = crate::keys::is_webos()
@@ -376,10 +376,7 @@ impl App {
             }
         }
         match self.hwplane.as_mut() {
-            Some(p) => {
-                p.invalidate();
-                rdtv_media::ndl::set_target_window(Some(p.id()));
-            }
+            Some(p) => rdtv_media::ndl::set_target_window(Some(p.id())),
             None => rdtv_media::ndl::set_target_window(None),
         }
     }

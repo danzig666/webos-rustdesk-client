@@ -98,6 +98,17 @@ No code was copied.
 - PTS is milliseconds since load, taken from a monotonic clock.
 - Reload happens when the aspect ratio changes.
 - Its codec list advertises H.264, H.265, VP9 and AV1 through NDL. Moonlight itself only streams H.264/H.265.
+- `modules/webos/smp/src/{smp_player.c,smp_resource_webos5.c,smp_video.c}`: the Starfish Load payload (`MakeLoadPayload`, codec names, `lowDelayMode`, `transmission.contentsType` WEBRTC), `option.windowId` from `SDL_webOSCreateExportedWindow(0)` on webOS 5, placement with `SDL_webOSSetExportedWindow` after Load, Feed payload with ns PTS and `esData`. `crates/rdtv-media/src/smp.rs` re-implements the payload (approach only, no code copied).
+
+## GLinnik21/plx-native
+
+| | |
+|---|---|
+| URL | https://github.com/GLinnik21/plx-native |
+| License | GPL-3.0-or-later (compatible with this project's AGPL-3.0) |
+| Evidence | code inspected (`src/starfish.c`) |
+
+**Used for:** the StarfishMediaAPIs C++ calling details in `crates/rdtv-media/csrc/smp_shim.c`: mangled symbol names, in-place construction into an over-allocated buffer, the Load-with-context overload, Feed's hidden `std::string` return slot and the pre-C++11 COW fallback (`_ZNSsD1Ev`). Its docs report the exported-window path works on webOS 5+.
 
 **Used for:** the decode-as-soon-as-possible design (video-only load, wall-clock ms PTS) in `ndl.rs`, re-implemented in Rust. No code was copied.
 
@@ -177,7 +188,6 @@ Every listed firmware from 3.9 onward has `libNDL_directmedia.so.1`.
 
 These leads are retained from the brief and have not been verified:
 
-- **GLinnik21/plx-native** (https://github.com/GLinnik21/plx-native, GPL-3.0-or-later per the brief). Not inspected in this session; lead retained from the brief. Its design-system ideas influenced nothing concrete. No code or branding was used.
 - **GuiDev1994/aurora-tv** (https://github.com/GuiDev1994/aurora-tv, GPL per the brief). Not inspected in this session; lead retained from the brief. The keyboard was designed independently from the owner's requirements.
 - **Informatic/webos-vncserver** (https://github.com/Informatic/webos-vncserver). Not inspected in this session; lead retained from the brief. Its only influence was confirming the design choice of no inbound listener and no root input injection.
 - **LG official webOS TV developer guides** (Magic Remote, app lifecycle, Developer Mode, `appinfo.json`). Not inspected in this session; lead retained from the brief. The `appinfo.json` fields follow the inspected punktfunk and moonlight-tv manifests.

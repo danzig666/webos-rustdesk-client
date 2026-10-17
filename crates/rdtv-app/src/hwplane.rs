@@ -1,11 +1,12 @@
 //! Experimental placement of the hardware video picture.
 //!
-//! NDL DirectMedia API 2 always presents full-screen. The SDL-webOS backport can export a
+//! NDL DirectMedia API 2 always presents full-screen; the Starfish pipeline can present into
+//! an exported window. The SDL-webOS backport can export a
 //! "video" punch-through window (`SDL_webOSCreateExportedWindow`) whose source crop and
 //! destination rectangle the compositor applies (`SDL_webOSSetExportedWindow`, see
-//! webosbrew/SDL-webOS `src/video/wayland/SDL_waylandwebos_foreign.c`). The window id is handed
-//! to NDL (`NDL_DirectMediaSetWindowId`) before the decoder loads. If any piece is missing or
-//! fails, the app keeps the full-screen behaviour.
+//! webosbrew/SDL-webOS `src/video/wayland/SDL_waylandwebos_foreign.c`). The window id goes into
+//! the Starfish decoder's Load payload (`rdtv_media::smp`). If any piece is missing or fails,
+//! the app keeps the NDL full-screen behaviour.
 //!
 //! The SDL symbols exist only in the webOS build of SDL, so they are looked up at runtime.
 
@@ -31,6 +32,7 @@ pub struct HwPlane {
     set: SetFn,
     destroy: DestroyFn,
     last: Option<(SdlRect, SdlRect)>,
+    generation: u64,
     pub failures: u32,
 }
 
@@ -63,6 +65,7 @@ impl HwPlane {
             set: unsafe { std::mem::transmute_copy(&set) },
             destroy: unsafe { std::mem::transmute_copy(&destroy) },
             last: None,
+            generation: 0,
             failures: 0,
         })
     }
@@ -88,9 +91,12 @@ impl HwPlane {
         ok
     }
 
-    /// Forget the cached placement (e.g. after a new decoder load).
-    pub fn invalidate(&mut self) {
-        self.last = None;
+    /// Forget the cached placement when the decoder was (re)loaded since the last call.
+    pub fn note_generation(&mut self, generation: u64) {
+        if self.generation != generation {
+            self.generation = generation;
+            self.last = None;
+        }
     }
 }
 

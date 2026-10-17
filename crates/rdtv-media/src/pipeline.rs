@@ -10,7 +10,7 @@
 //! * The network side never blocks: frames go through a bounded queue; overflow drops the
 //!   frame, flags a resync and asks for a keyframe (upstream `VIDEO_QUEUE_SIZE` behaviour).
 
-use crate::{frame::YuvFrame, ndl, vpx::VpxDecoder};
+use crate::{frame::YuvFrame, ndl, smp, vpx::VpxDecoder};
 use rdtv_core::message_proto::{video_frame, EncodedVideoFrame, VideoFrame};
 use std::{
     sync::{
@@ -209,6 +209,72 @@ impl Drop for VideoPipeline {
     }
 }
 
+/// The hardware decoder in use: Starfish into the app's exported window when the app
+/// created one (the picture can then be placed and scaled), else NDL full-screen.
+enum HwPlayer {
+    Smp(smp::SmpPlayer),
+    Ndl(ndl::NdlPlayer),
+}
+
+impl HwPlayer {
+    fn load(codec: ndl::HwCodec, w: i32, h: i32) -> anyhow::Result<HwPlayer> {
+        if ndl::target_window().is_some() {
+            match smp::SmpPlayer::load(codec, w, h) {
+                Ok(p) => {
+                    ndl::set_window_state(
+                        true,
+                        format!("Starfish decoder in exported window ({})", codec.name()),
+                    );
+                    return Ok(HwPlayer::Smp(p));
+                }
+                Err(e) => {
+                    log::warn!("Starfish unavailable, using NDL: {e:#}");
+                    ndl::set_window_state(false, format!("Starfish failed ({e:#}); NDL full-screen"));
+                }
+            }
+        } else {
+            ndl::set_window_state(false, "no exported window; NDL full-screen".into());
+        }
+        ndl::NdlPlayer::load(codec, w, h).map(HwPlayer::Ndl)
+    }
+    fn codec(&self) -> ndl::HwCodec {
+        match self {
+            HwPlayer::Smp(p) => p.codec,
+            HwPlayer::Ndl(p) => p.codec,
+        }
+    }
+    fn width(&self) -> i32 {
+        match self {
+            HwPlayer::Smp(p) => p.width,
+            HwPlayer::Ndl(p) => p.width,
+        }
+    }
+    fn height(&self) -> i32 {
+        match self {
+            HwPlayer::Smp(p) => p.height,
+            HwPlayer::Ndl(p) => p.height,
+        }
+    }
+    fn play(&mut self, data: &[u8]) -> anyhow::Result<bool> {
+        match self {
+            HwPlayer::Smp(p) => p.play(data),
+            HwPlayer::Ndl(p) => p.play(data),
+        }
+    }
+    fn is_dead(&self) -> bool {
+        match self {
+            HwPlayer::Smp(p) => p.is_dead(),
+            HwPlayer::Ndl(p) => p.is_dead(),
+        }
+    }
+    fn presenting(&self) -> bool {
+        match self {
+            HwPlayer::Smp(p) => p.presenting(),
+            HwPlayer::Ndl(p) => p.presenting(),
+        }
+    }
+}
+
 struct Worker {
     config: PipelineConfig,
     rx: Receiver<Msg>,
@@ -216,7 +282,7 @@ struct Worker {
     mailbox: Mailbox,
     stats: Arc<Stats>,
     on_event: Arc<dyn Fn(PipelineEvent) + Send + Sync>,
-    hw: Option<ndl::NdlPlayer>,
+    hw: Option<HwPlayer>,
     sw: Option<VpxDecoder>,
     size: (i32, i32),
     display: i32,
@@ -317,7 +383,7 @@ impl Worker {
 
     fn decode_hw(&mut self, codec: Codec, frames: Vec<EncodedVideoFrame>) {
         let hwc = codec.hw().expect("hardware codec");
-        let needs_load = self.hw.as_ref().is_none_or(|p| p.codec != hwc);
+        let needs_load = self.hw.as_ref().is_none_or(|p| p.codec() != hwc);
         if needs_load {
             self.hw = None;
             self.sw = None;
@@ -325,7 +391,7 @@ impl Worker {
                 *m = None;
             }
             let (w, h) = if self.size.0 > 0 { self.size } else { (1920, 1080) };
-            match ndl::NdlPlayer::load(hwc, w, h) {
+            match HwPlayer::load(hwc, w, h) {
                 Ok(p) => self.hw = Some(p),
                 Err(e) => return self.fail(codec, e.to_string()),
             }
@@ -341,8 +407,8 @@ impl Worker {
                         (self.on_event)(PipelineEvent::Presenting {
                             codec,
                             hardware: true,
-                            width: p.width,
-                            height: p.height,
+                            width: p.width(),
+                            height: p.height(),
                         });
                     }
                 }

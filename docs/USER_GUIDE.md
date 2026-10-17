@@ -41,10 +41,10 @@ empty and wait for someone at the computer to click Accept.
 
 | Button | Action |
 |---|---|
-| Magic Remote pointer | Move the mouse; **OK/click** = left click; **wheel** = scroll |
+| Magic Remote pointer | Move the mouse; **OK/click** = left click; **hold OK ½ s** = right click; **wheel** = scroll |
 | **Red** | Right click |
 | **Green** | Next monitor (wraps around); the monitor name is shown |
-| **Yellow** | Arrow buttons: **Mouse mode** ↔ **Arrow-key mode** (shown top right) |
+| **Yellow** | Arrow buttons: **Mouse mode** ↔ **Arrow-key mode** |
 | **Blue** | On-screen keyboard |
 | **Back** (short press) | Closes the open menu or keyboard; otherwise shows/hides the toolbar. Never disconnects |
 | Arrow buttons | Mouse mode: move the mouse (hold to accelerate); OK clicks. Arrow mode: arrow keys, OK = Enter |
@@ -58,8 +58,9 @@ View, Keys, Mute, Quality, Info, Disconnect.
 ## Toolbar menus
 
 * **View**: Fit to screen (default), Original size 1:1, Zoom in/out (the view follows the mouse).
-  These only change the TV's view, never the computer's resolution. With hardware decoding the TV
-  always shows the full picture (Fit); switch off Settings → Hardware video decoding for 1:1 and zoom.
+  These only change the TV's view, never the computer's resolution. With hardware decoding this
+  needs Settings → Hardware picture placement (on by default, experimental). If the TV cannot place
+  the hardware picture, it always shows the full picture; Settings → Diagnostics says why.
 * **Keys**: Ctrl+Alt+Del (the real secure-attention action, if the computer allows it), Lock remote
   computer, Escape, Windows key, Alt+Tab, Alt+F4, Double-click, **Drag lock** (the next OK presses
   and holds the left button until the following OK), Refresh video, Release stuck keys, Lock on
