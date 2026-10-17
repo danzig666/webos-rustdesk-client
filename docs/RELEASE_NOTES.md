@@ -23,6 +23,13 @@ CI (cross-compile, ELF/ABI audit, emulated self-test, IPK verification). Please 
 * Fit, 1:1 and zoom; keyboard shrink or overlay.
 * Default disconnect when leaving the app, with Reconnect; optional keep-connected; 30 s automatic reconnect.
 * Accounts and address book where the server provides them.
+* USB/Bluetooth keyboards: shortcuts with held modifiers (Alt+Tab, Win+E, Ctrl+C) and special keys.
+
+### Known limitations
+
+* webOS keeps some keyboard function keys for the TV (on an LG C3: F2, F11, F12). Use the
+  on-screen keyboard's **More** page for those.
+* A keyboard's Esc arrives as the remote's Back; it is sent as Esc while you are typing.
 
 ### Files
 

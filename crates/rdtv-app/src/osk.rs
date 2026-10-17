@@ -239,6 +239,23 @@ fn bottom_row(mode: Mode) -> Vec<(K, f32)> {
     v
 }
 
+/// (x, width) of each key in a row spanning `left`..`left + width`. A key `wu` units wide
+/// also covers the `wu - 1` gaps it spans, so those come out of the unit size too.
+fn row_geometry(row: &[(K, f32)], left: f32, width: f32, gap: f32) -> Vec<(f32, f32)> {
+    let units: f32 = row.iter().map(|(_, w)| *w).sum();
+    let spanned: f32 = row.iter().map(|(_, w)| (*w - 1.0).max(0.0)).sum();
+    let unit = (width - gap * (row.len() as f32 - 1.0 + spanned)) / units;
+    let mut x = left;
+    row.iter()
+        .map(|(_, wu)| {
+            let w = unit * wu + gap * (wu - 1.0).max(0.0);
+            let out = (x, w);
+            x += w + gap;
+            out
+        })
+        .collect()
+}
+
 fn fn_row() -> Vec<(K, f32)> {
     let mut v = vec![(K::Ctrl("Esc", ControlKey::Escape), 1.2)];
     let f = [
@@ -563,7 +580,7 @@ impl Osk {
             let mut remove: Option<usize> = None;
             for (i, s) in self.shortcuts.iter().enumerate() {
                 let w = (f.g.text_width(&s.label, size::SMALL, true) + 40).min(360);
-                if x + w > main_w - 260 {
+                if x + w > main_w - 290 {
                     break;
                 }
                 let r = Rect::new(x, y, w as u32, key_h as u32);
@@ -601,7 +618,7 @@ impl Osk {
                 self.shortcuts.remove(i);
                 out.push(OskAction::ShortcutsChanged(self.shortcuts.clone()));
             }
-            let save_r = Rect::new(main_w - 250, y, 120, key_h as u32);
+            let save_r = Rect::new(main_w - 280, y, 130, key_h as u32);
             if f.button(idx("osk-sc-save", 0), save_r, "+ Save", false) {
                 if let Some(keys) = self.last_chord.clone() {
                     let label = keys.join("+");
@@ -611,7 +628,7 @@ impl Osk {
                     }
                 }
             }
-            let rm_r = Rect::new(main_w - 120, y, 150, key_h as u32);
+            let rm_r = Rect::new(main_w - 140, y, 170, key_h as u32);
             if f.button(
                 idx("osk-sc-rm", 0),
                 rm_r,
@@ -631,12 +648,13 @@ impl Osk {
         all_rows.push(bottom_row(self.mode));
         let rows_top = y;
         for row in &all_rows {
-            let units: f32 = row.iter().map(|(_, w)| *w).sum();
-            let unit = (main_w as f32 - gap as f32 * (row.len() as f32 - 1.0)) / units;
-            let mut x: f32 = 30.0;
-            for (k, wu) in row {
-                let w = unit * wu + gap as f32 * (wu - 1.0).max(0.0);
-                let r = Rect::new(x.round() as i32, y, w.round() as u32, key_h as u32);
+            for ((k, _), (x, w)) in row.iter().zip(row_geometry(row, 30.0, main_w as f32, gap as f32)) {
+                let r = Rect::new(
+                    x.round() as i32,
+                    y,
+                    (x + w).round() as u32 - x.round() as u32,
+                    key_h as u32,
+                );
                 let label = self.key_label(k);
                 let id = if matches!(k, K::Enter) {
                     crate::ui::id("osk-enter")
@@ -690,7 +708,6 @@ impl Osk {
                 if act {
                     self.press(*k, &mut out);
                 }
-                x += w + gap as f32;
             }
             y += key_h + gap;
         }
@@ -759,6 +776,21 @@ impl Osk {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_row_ends_at_the_right_edge() {
+        let mut all = vec![fn_row(), bottom_row(Mode::Remote), bottom_row(Mode::Local)];
+        for l in [KeyboardLayout::EnUs, KeyboardLayout::Hu] {
+            for mac in [false, true] {
+                all.extend(rows(l, mac));
+            }
+        }
+        for row in &all {
+            let g = row_geometry(row, 30.0, 1860.0, 10.0);
+            let (x, w) = *g.last().unwrap();
+            assert!((x + w - 1890.0).abs() < 0.01, "row ends at {}", x + w);
+        }
+    }
 
     fn press_char(o: &mut Osk, n: char) -> Vec<OskAction> {
         let rows = rows(o.layout, false);

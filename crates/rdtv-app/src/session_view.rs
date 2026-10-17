@@ -1630,7 +1630,7 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             }
         }
         Menu::View => {
-            title = "View (local only; the remote resolution never changes)".to_owned();
+            title = "View (on the TV only)".to_owned();
             let hw = a.hw_fit_only();
             rows.push(("Fit to screen".into(), Act::View(ViewMode::Fit)));
             if hw {

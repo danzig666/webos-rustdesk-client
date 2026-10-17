@@ -13,17 +13,32 @@ sofa with the Magic Remote, a regular remote, or a USB/Bluetooth mouse and keybo
 
 Not affiliated with or endorsed by RustDesk or LG.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Home screen with a recent computer](docs/screenshots/home.png) | ![Session with the toolbar open](docs/screenshots/session-toolbar.png) |
+| Home: connect by ID or address, favourites, recent computers | Session toolbar (Back): keyboard, monitor, mouse/arrows, view, keys, quality |
+| ![On-screen keyboard during a session](docs/screenshots/session-keyboard.png) | ![View menu](docs/screenshots/view-menu.png) |
+| On-screen keyboard (Blue) with the picture shrunk above it | View menu: fit, 1:1, zoom (also with hardware decoding) |
+
+Captured from the desktop build of the app connected to a stock RustDesk 1.5.0 host; on the TV
+the screens look the same.
+
 ## Features
 
 * Connect by RustDesk **ID** (public server or your **self-hosted** server, as separate profiles) or
   by **direct IP**. Password login, optional "Remember password?", 2FA, remote approval.
-* **Hardware video decoding** through the TV's NDL DirectMedia (H.264, H.265, VP9, AV1), with
-  software VP9/VP8 fallback. Remote **audio** with mute.
+* **Hardware video decoding** (H.264, H.265, VP9, AV1) through the TV's Starfish media pipeline, so
+  the picture can still be shrunk and zoomed; NDL DirectMedia and software VP9/VP8 as fallbacks.
+  Remote **audio** with mute.
 * TV-first controls: Magic Remote pointing; **Red** right click, **Green** next monitor,
   **Yellow** mouse/arrow mode, **Blue** keyboard, **Back** toolbar. Everything is also reachable
   without colour buttons.
 * Full **on-screen keyboard**: US English and **Hungarian** layouts, Ctrl/Alt/AltGr/Shift/Win
   (once or locked), F1–F12, navigation keys, numpad, per-computer shortcut row, Ctrl+Alt+Del.
+* **USB/Bluetooth keyboards**: typing, shortcuts with held modifiers (Alt+Tab, Win+E, Ctrl+C,
+  Shift+arrows) and special keys are forwarded to the computer.
 * Fit / 1:1 / zoom views, keyboard shrink or overlay, monitor picker, quality controls,
   lock-on-disconnect.
 * Leaving the app disconnects by default (one-press Reconnect on return); optional
@@ -31,6 +46,17 @@ Not affiliated with or endorsed by RustDesk or LG.
 * Accounts and address book when your server provides them.
 * Out of scope by design: file transfer, clipboard sync, chat, recording, terminal, tunnels,
   multiple sessions, incoming control of the TV.
+
+## Known limitations
+
+* **Some function keys never reach the app.** webOS keeps certain keyboard keys for the TV itself
+  before any app sees them: on an LG C3, **F2, F11 and F12** change TV settings (for example
+  volume/mute) instead of reaching the computer. Other F-keys (F1, F6, F8, F9…) are forwarded.
+  Use the on-screen keyboard's **More** page (Blue button) for the missing ones.
+* **Esc on a keyboard arrives as the remote's Back button** (same key code from the TV). During a
+  session it is sent to the computer as Esc while you are typing (for 10 s after the last key);
+  otherwise Back opens the toolbar. Ctrl+Alt+Shift+Space always opens the toolbar.
+* Tested on one TV model so far (LG C3); reports from other models are welcome.
 
 ## Install
 
