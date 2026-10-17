@@ -1,8 +1,15 @@
 [package]
 name = "rdtv-media"
+description = "Video/audio decoding for RemoteDesk TV: webOS NDL hardware decode, libvpx fallback, Opus"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+
 [dependencies]
 log.workspace = true
 anyhow.workspace = true
+libc = "0.2"
+rdtv-core = { path = "../rdtv-core" }
+
+[build-dependencies]
+cc = "1.2"

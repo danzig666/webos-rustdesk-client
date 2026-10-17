@@ -207,6 +207,9 @@ pub enum SessionCommand {
     SetFps(u32),
     SetAudio(bool),
     ChangeResolution { display: i32, width: i32, height: i32 },
+    /// Re-advertise decodable codecs (e.g. after a hardware decoder failed); upstream
+    /// `update_supported_decodings`.
+    UpdateDecoding(DecodeCaps),
     /// End the session. `lock` sends upstream's LockScreen first when the transport is up.
     Disconnect { lock: bool },
 }
@@ -690,6 +693,14 @@ async fn run(
                         let m = misc_msg(|m| m.set_change_display_resolution(DisplayResolution {
                             display,
                             resolution: MessageField::some(Resolution { width, height, ..Default::default() }),
+                            ..Default::default()
+                        }));
+                        if connected { peer.send(&m).await } else { Ok(()) }
+                    }
+                    SessionCommand::UpdateDecoding(caps) => {
+                        req.caps = caps;
+                        let m = misc_msg(|m| m.set_option(OptionMessage {
+                            supported_decoding: MessageField::some(caps.to_supported_decoding(req.settings.codec)),
                             ..Default::default()
                         }));
                         if connected { peer.send(&m).await } else { Ok(()) }
