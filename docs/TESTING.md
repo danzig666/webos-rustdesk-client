@@ -21,6 +21,8 @@ Each result says what kind of evidence it is: **unit test (CI)**, **emulation (C
 | Probe (x86_64) ↔ stock RustDesk 1.5.0 Linux host, direct IP | real host, desktop client | connected, login, VP9 1080p decode, cursor, click, text, close (see [evidence](evidence/2026-10-17-linux-host-probe.md)) |
 | Probe (ARM build, qemu-arm armel) ↔ same host | real host, emulated ARM client | connected, login, 35/35 VP9 1080p frames decoded with NEON libvpx, input delivered |
 | Full app (desktop simulator) driven by synthetic keypresses: Home → ID editor → Connect → password dialog → editor → live session → OSK → toolbar | real host, desktop client | all steps worked. Screenshots showed the live remote desktop, OSK shrink mode with aspect preserved, and the toolbar |
+| Wrong password, then correct password (simulator) | real host, desktop client | "Wrong password. Please try again." dialog, then connected |
+| Unexpected loss: host restarted mid-session (simulator) | real host, desktop client | "Connection lost · Reconnecting in N s · Giving up in 27 s" with Cancel; attempt 2 failed while the host restarted, attempt 3 reconnected automatically with the in-memory login hash (no password prompt) and the picture resumed |
 | Hungarian text through the host | real host | lower case correct; upper case `Ő Ű` correct, `Á É Í Ó Ö Ú Ü` lower-cased by the Linux/X11 host (host-side, see COMPATIBILITY) |
 | SDK glibc 2.12 runtime under qemu | emulation | does not run (even a C hello world segfaults), so the armel userland is used instead; this says nothing about TVs |
 
