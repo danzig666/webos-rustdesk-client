@@ -181,10 +181,29 @@ fn log_key(k: &RawKey) {
     if k.repeat {
         return;
     }
-    let name = Keycode::from_i32(k.sym)
-        .map(|c| c.name())
-        .filter(|n| !n.is_empty())
-        .unwrap_or_else(|| format!("sym {}", k.sym));
+    // Never `Keycode::name()`: for webOS remote keys SDL builds the name from an xkb keysym
+    // outside Unicode, and the crate's UTF-8 unwrap then panics (0.2.0 crashed on Back).
+    let name = if (0..512).contains(&k.scancode) {
+        extern "C" {
+            // Declared with a plain int: webOS scancodes are not variants of the bindgen enum.
+            fn SDL_GetScancodeName(scancode: std::ffi::c_int) -> *const std::ffi::c_char;
+        }
+        let p = unsafe { SDL_GetScancodeName(k.scancode) };
+        if p.is_null() {
+            String::new()
+        } else {
+            unsafe { std::ffi::CStr::from_ptr(p) }
+                .to_string_lossy()
+                .into_owned()
+        }
+    } else {
+        String::new()
+    };
+    let name = if name.is_empty() {
+        format!("key 0x{:x}", k.sym)
+    } else {
+        format!("{name} (0x{:x})", k.sym)
+    };
     let line = format!(
         "{}{} sc{} m{:x}",
         if k.down { "+" } else { "-" },
@@ -456,6 +475,23 @@ pub fn physical_to_remote(key: Keycode, mods: &KeyMods) -> Option<RemoteKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn key_log_survives_webos_remote_keys() {
+        // 0.2.0 panicked here on the TV's Back key (name built from a non-Unicode keysym).
+        for (sc, sym) in [(482, 0x4000_01e2), (482, 0x20_0001), (41, 27), (9999, -5)] {
+            log_key(&RawKey {
+                down: true,
+                repeat: false,
+                scancode: sc,
+                sym,
+                modstate: 0,
+            });
+        }
+        let keys = recent_keys();
+        assert!(keys.iter().any(|k| k.contains("sc482")));
+        assert!(keys.iter().any(|k| k.contains("Escape")));
+    }
 
     #[test]
     fn webos_colour_and_back_scancodes() {
