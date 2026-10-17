@@ -3,8 +3,8 @@
 Community RustDesk-compatible remote desktop client for LG webOS TVs (webOS 5.x and newer). It
 connects **out** to a computer running the normal RustDesk app (protocol baseline RustDesk 1.5.0).
 
-Tested on an LG webOS TV with a Windows RustDesk host: connecting, Magic Remote pointer, clicks
-and scrolling, remote buttons, hardware video and keyboard shrink work. Each build is also checked in
+Tested on an **LG C3** with a Windows RustDesk host: connecting, Magic Remote pointer, clicks and
+scrolling, remote buttons, hardware video, keyboard shrink and zoom work. Each build is also checked in
 CI (cross-compile, ELF/ABI audit, emulated self-test, IPK verification). Please report problems.
 
 ### Install

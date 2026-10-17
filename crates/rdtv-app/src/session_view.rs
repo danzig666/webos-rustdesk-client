@@ -51,6 +51,12 @@ const KEYBOARD_ACTIVE: Duration = Duration::from_secs(10);
 const LONG_PRESS: Duration = Duration::from_millis(500);
 /// Pointer travel (UI px) that turns a held press into a drag instead of a long press.
 const DRAG_SLOP: i32 = 18;
+/// Zoom/1:1: the Magic Remote pointer this close to a screen edge pans the view.
+const EDGE_PAN_ZONE: f32 = 90.0;
+/// Pan speed (UI px/s) with the pointer at the very edge.
+const EDGE_PAN_SPEED: f32 = 1400.0;
+/// Edge panning stops once the pointer has been still this long (the TV hides it).
+const EDGE_PAN_POINTER_IDLE: Duration = Duration::from_secs(3);
 
 /// A left press that is not sent yet: it becomes a click (released early), a drag (pointer
 /// moved) or a right click (held for `LONG_PRESS`).
@@ -134,6 +140,7 @@ pub struct ActiveSession {
     dpad_since: Option<Instant>,
     last_pointer: Option<Instant>,
     pointer_ui: (i32, i32),
+    last_tick: Instant,
     drag_lock: bool,
     ok_down: bool,
     press: Option<PendingPress>,
@@ -304,6 +311,7 @@ impl ActiveSession {
             dpad_since: None,
             last_pointer: None,
             pointer_ui: (W / 2, H / 2),
+            last_tick: Instant::now(),
             drag_lock: false,
             ok_down: false,
             press: None,
@@ -754,11 +762,66 @@ impl ActiveSession {
                 }
             }
         }
+        let dt = self.last_tick.elapsed().as_secs_f32().min(0.1);
+        self.last_tick = Instant::now();
+        self.edge_pan(dt);
         let decoded = self.pipe.stats.decoded.load(Ordering::Relaxed);
         if self.fps_count.0.elapsed() >= Duration::from_secs(1) {
             let el = self.fps_count.0.elapsed().as_secs_f32();
             self.fps_count.2 = (decoded - self.fps_count.1) as f32 / el;
             self.fps_count = (Instant::now(), decoded, self.fps_count.2);
+        }
+    }
+
+    /// Zoom/1:1: pan while the Magic Remote pointer rests near a screen edge, and keep the
+    /// remote mouse under the pointer.
+    fn edge_pan(&mut self, dt: f32) {
+        if self.view.mode == ViewMode::Fit
+            || self.hw_fit_only()
+            || self.menu != Menu::None
+            || self.press.is_some_and(|p| !p.fired)
+            || !self
+                .last_pointer
+                .is_some_and(|t| t.elapsed() < EDGE_PAN_POINTER_IDLE)
+        {
+            return;
+        }
+        let (px, py) = (self.pointer_ui.0 as f32, self.pointer_ui.1 as f32);
+        let osk_h = self.osk.as_ref().map(|o| o.height()).unwrap_or(0);
+        let bottom = (H - osk_h) as f32;
+        if py >= bottom {
+            return;
+        }
+        let top = if self.toolbar {
+            (TOOLBAR_H + 20) as f32
+        } else {
+            0.0
+        };
+        if py < top {
+            return;
+        }
+        let depth = |d: f32| ((EDGE_PAN_ZONE - d) / EDGE_PAN_ZONE).clamp(0.0, 1.0);
+        let dir_x = depth(W as f32 - 1.0 - px) - depth(px);
+        let dir_y = depth(bottom - 1.0 - py) - depth(py - top);
+        if dir_x == 0.0 && dir_y == 0.0 {
+            return;
+        }
+        let v = self.view_rect();
+        let area_w = W as f32;
+        let area_h = bottom;
+        let step = EDGE_PAN_SPEED * dt;
+        // Pan range where the picture actually moves (view::view_rect clamps beyond it).
+        let pan = |cur: f32, dir: f32, len: f32, area_len: f32| -> f32 {
+            if len <= area_len {
+                return cur;
+            }
+            let lo = area_len / 2.0 / len;
+            (cur.clamp(lo, 1.0 - lo) + dir * step / len).clamp(lo, 1.0 - lo)
+        };
+        self.view.pan_x = pan(self.view.pan_x, dir_x, v.w, area_w);
+        self.view.pan_y = pan(self.view.pan_y, dir_y, v.h, area_h);
+        if let Some((hx, hy)) = self.pointer_host(self.pointer_ui.0, self.pointer_ui.1) {
+            self.move_to(hx, hy);
         }
     }
 

@@ -57,7 +57,8 @@ View, Keys, Mute, Quality, Info, Disconnect.
 
 ## Toolbar menus
 
-* **View**: Fit to screen (default), Original size 1:1, Zoom in/out (the view follows the mouse).
+* **View**: Fit to screen (default), Original size 1:1, Zoom in/out. When zoomed, move the Magic
+  Remote pointer to a screen edge to scroll the view (the arrow buttons' mouse also drags it along).
   These only change the TV's view, never the computer's resolution. With hardware decoding this
   needs Settings → Hardware picture placement (on by default, experimental). If the TV cannot place
   the hardware picture, it always shows the full picture; Settings → Diagnostics says why.
