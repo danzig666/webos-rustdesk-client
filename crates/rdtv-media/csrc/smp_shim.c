@@ -9,6 +9,7 @@
  * buffer, Feed's hidden std::string return slot, the pre-C++11 COW string fallback) follow
  * plx-native's src/starfish.c (GPL-3.0) and ss4s modules/webos/smp (LGPL-3.0); see docs/SOURCES.md.
  */
+#define _GNU_SOURCE
 #include <dlfcn.h>
 #include <stdint.h>
 #include <stdio.h>
