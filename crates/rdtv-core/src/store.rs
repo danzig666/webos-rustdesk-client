@@ -122,6 +122,9 @@ pub struct PeerSettings {
     pub pan_y: f32,
     pub keyboard_layout: KeyboardLayout,
     pub osk_presentation: OskPresentation,
+    /// Opening the keyboard moves the picture so the last clicked spot (usually the text
+    /// field) stays visible above it, at normal size; `osk_presentation` applies otherwise.
+    pub osk_follow_click: bool,
     pub dpad_mode: DpadMode,
     pub shortcuts: Option<Vec<Shortcut>>,
     pub quality: Quality,
@@ -144,6 +147,7 @@ impl Default for PeerSettings {
             pan_y: 0.5,
             keyboard_layout: KeyboardLayout::EnUs,
             osk_presentation: OskPresentation::Shrink,
+            osk_follow_click: true,
             dpad_mode: DpadMode::Mouse,
             shortcuts: None,
             quality: Quality::Balanced,

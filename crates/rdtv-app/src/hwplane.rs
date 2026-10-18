@@ -93,11 +93,12 @@ impl HwPlane {
         let (mut o, mut s, mut d) = (org, src, dst);
         // Panning only changes the crop: re-sending the window first would briefly show the
         // whole picture squeezed into `dst` (the view seemed to resize and jump back).
-        let crop_only = src != org
-            && self.crop.is_some()
-            && self
-                .last
-                .is_some_and(|(lo, ls, ld)| lo == org && ld == dst && ls != lo);
+        // While cropping, the crop region alone carries source and destination; re-sending
+        // the window first would briefly show the whole picture squeezed into `dst` (the
+        // view seemed to resize and jump back), which animations would do on every frame.
+        // The window is still sent once after each decoder load and when cropping ends.
+        let crop_only =
+            src != org && self.crop.is_some() && self.last.is_some_and(|(lo, ls, _)| lo == org && ls != lo);
         let ok = crop_only || unsafe { (self.set)(self.id.as_ptr(), &mut o, &mut d) } != 0;
         if ok && src != org {
             if let Some(crop) = self.crop {

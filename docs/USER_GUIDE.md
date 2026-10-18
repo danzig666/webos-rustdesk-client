@@ -82,8 +82,14 @@ View, Keys, Mute, Quality, Info, Disconnect.
 * **Shortcut row** (saved per computer): defaults Alt+Tab, Task Manager, Win+D, Copy, Paste. Copy
   and paste act on the computer only; nothing is copied to or from the TV. Press keys, then
   **+ Save** to add the last key combination; **Remove…** deletes shortcuts.
-* By default the picture **shrinks** above the keyboard so the whole screen stays visible; View →
-  Keyboard switches to **overlay**. Closing the keyboard restores your previous view.
+* **Click into a text field, then press Blue**: the picture keeps its normal size and slides up so the
+  field you clicked stays visible above the keyboard, and you can read what you type. (This uses
+  the last click from the past 30 seconds; switch it off in View → "Keyboard follows last click".)
+  Without a recent click the picture **shrinks** above the keyboard so the whole screen stays
+  visible; View → Keyboard switches that to **overlay**. Closing the keyboard restores your
+  previous view.
+* Zooming, view changes and opening/closing the keyboard animate smoothly; Settings → Reduced
+  motion turns the animation off.
 
 ## Leaving the app and reconnecting
 

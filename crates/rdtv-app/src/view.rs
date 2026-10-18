@@ -25,6 +25,11 @@ impl RectF {
     pub fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
         RectF { x, y, w, h }
     }
+    /// `self` moved `t` (0..1) of the way to `to`.
+    pub fn lerp(self, to: RectF, t: f32) -> RectF {
+        let l = |a: f32, b: f32| a + (b - a) * t;
+        RectF::new(l(self.x, to.x), l(self.y, to.y), l(self.w, to.w), l(self.h, to.h))
+    }
     pub fn contains(&self, px: f32, py: f32) -> bool {
         px >= self.x && py >= self.y && px < self.x + self.w && py < self.y + self.h
     }

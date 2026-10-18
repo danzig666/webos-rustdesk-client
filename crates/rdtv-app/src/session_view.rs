@@ -58,6 +58,10 @@ const EDGE_PAN_ZONE: f32 = 90.0;
 const EDGE_PAN_SPEED: f32 = 1400.0;
 /// Edge panning stops once the pointer has been still this long (the TV hides it).
 const EDGE_PAN_POINTER_IDLE: Duration = Duration::from_secs(3);
+/// View changes (zoom, view mode, keyboard open/close) animate over this long.
+const VIEW_ANIM: Duration = Duration::from_millis(280);
+/// A click this recent is taken as the text field the keyboard is opened for.
+const FOLLOW_CLICK_MAX_AGE: Duration = Duration::from_secs(30);
 
 /// A left press that is not sent yet: it becomes a click (released early), a drag (pointer
 /// moved) or a right click (held for `LONG_PRESS`).
@@ -136,6 +140,17 @@ pub struct ActiveSession {
     pub menu: Menu,
     pub osk: Option<Osk>,
     view_before_osk: Option<ViewState>,
+    /// Host position of the last mouse-button press, and when.
+    last_click: Option<(Instant, (i32, i32))>,
+    /// While the keyboard is open: the clicked spot to keep visible above it.
+    osk_focus: Option<(i32, i32)>,
+    /// The picture rectangle as drawn (animated towards `target_view_rect`).
+    shown: Option<RectF>,
+    anim: Option<(RectF, Instant)>,
+    last_target: Option<RectF>,
+    /// The next change of the target rectangle animates (set by zoom/view/keyboard actions).
+    animate_next: bool,
+    pub reduced_motion: bool,
     vmouse: (i32, i32),
     dpad: [bool; 4],
     dpad_since: Option<Instant>,
@@ -307,6 +322,13 @@ impl ActiveSession {
             menu: Menu::None,
             osk: None,
             view_before_osk: None,
+            last_click: None,
+            osk_focus: None,
+            shown: None,
+            anim: None,
+            last_target: None,
+            animate_next: false,
+            reduced_motion: false,
             vmouse: (0, 0),
             dpad: [false; 4],
             dpad_since: None,
@@ -632,9 +654,73 @@ impl ActiveSession {
             .unwrap_or((1920.0, 1080.0))
     }
 
-    /// The area the picture may use and `V` within it.
+    /// The picture rectangle as currently drawn; input mapping uses the same rectangle.
     pub fn view_rect(&self) -> RectF {
+        self.shown.unwrap_or_else(|| self.target_view_rect())
+    }
+
+    /// Advance the view animation one frame (call once per frame before drawing).
+    pub fn update_view_anim(&mut self) {
+        let target = self.target_view_rect();
+        if self.last_target != Some(target) {
+            if self.animate_next && !self.reduced_motion {
+                if let Some(cur) = self.shown {
+                    self.anim = Some((cur, Instant::now()));
+                }
+            }
+            self.last_target = Some(target);
+        }
+        self.animate_next = false;
+        self.shown = Some(match self.anim {
+            Some((from, t0)) => {
+                let t = t0.elapsed().as_secs_f32() / VIEW_ANIM.as_secs_f32();
+                if t >= 1.0 {
+                    self.anim = None;
+                    target
+                } else {
+                    // Ease-out cubic: quick start, soft landing.
+                    from.lerp(target, 1.0 - (1.0 - t).powi(3))
+                }
+            }
+            None => target,
+        });
+    }
+
+    /// Keyboard open and following a click: the picture at its normal (keyboard-less) size,
+    /// moved just enough that the clicked spot sits in the visible area above the keyboard.
+    fn follow_click_rect(&self, focus: (i32, i32), osk_h: i32) -> Option<RectF> {
+        let m = self.monitor()?;
+        let (sw, sh) = self.stream_size();
+        let full = RectF::new(0.0, 0.0, W as f32, H as f32);
+        let v = view::view_rect(full, sw, sh, &self.view, self.px_per_logical);
+        let (fx, fy) = view::from_host(v, m, focus.0, focus.1);
+        let visible_bottom = (H - osk_h) as f32;
+        let mut dy = 0.0;
+        if fy > visible_bottom - 140.0 {
+            // Below or close to the keyboard: lift it to a bit above the middle of what is left,
+            // never so far that a gap opens between the picture and the keyboard.
+            dy = (visible_bottom * 0.55 - fy).max((visible_bottom - (v.y + v.h)).min(0.0));
+        }
+        let mut dx = 0.0;
+        if fx < W as f32 * 0.1 || fx > W as f32 * 0.9 {
+            // Zoomed in with the spot off to a side: bring it in, within the picture's range.
+            let lo = (W as f32 - (v.x + v.w)).min(0.0);
+            let hi = (-v.x).max(0.0);
+            dx = (W as f32 * 0.35 - fx).clamp(lo, hi);
+        }
+        Some(RectF::new(v.x + dx, v.y + dy, v.w, v.h))
+    }
+
+    /// Where the picture should be: the area it may use and `V` within it.
+    fn target_view_rect(&self) -> RectF {
         let osk_h = self.osk.as_ref().map(|o| o.height()).unwrap_or(0);
+        if let (Some(_), Some(focus)) = (self.osk.as_ref(), self.osk_focus) {
+            if !self.hw_fit_only() {
+                if let Some(r) = self.follow_click_rect(focus, osk_h) {
+                    return r;
+                }
+            }
+        }
         let shrink = self.osk.is_some()
             && self.settings.osk_presentation == OskPresentation::Shrink
             && !self.hw_fullscreen();
@@ -673,6 +759,9 @@ impl ActiveSession {
 
     fn send_button(&mut self, b: MouseButton, down: bool) {
         let (x, y) = self.click_pos();
+        if down {
+            self.last_click = Some((Instant::now(), (x, y)));
+        }
         self.held.note_button(b, down, x, y);
         self.send(input::mouse_button(b, down, x, y, Self::mods_none()));
     }
@@ -700,18 +789,28 @@ impl ActiveSession {
             .is_some_and(|p| p.platform.eq_ignore_ascii_case("Mac OS"));
         o.shortcuts = self.settings.shortcuts.clone().unwrap_or_default();
         self.view_before_osk = Some(self.view);
+        self.osk_focus = self
+            .last_click
+            .filter(|(t, _)| self.settings.osk_follow_click && t.elapsed() < FOLLOW_CLICK_MAX_AGE)
+            .map(|(_, p)| p);
+        self.animate_next = true;
         self.osk = Some(o);
         self.toolbar = false;
         self.menu = Menu::None;
         // Keyboard owns the D-pad while open; release anything the D-pad was holding.
         self.dpad = [false; 4];
-        if self.hw_fullscreen() && self.settings.osk_presentation == OskPresentation::Shrink {
+        if self.hw_fullscreen()
+            && self.settings.osk_presentation == OskPresentation::Shrink
+            && self.osk_focus.is_none()
+        {
             self.notice = Some(("With hardware decoding the TV shows the picture full-screen, so the keyboard overlays it (shrink needs software decoding).".into(), Instant::now()));
         }
     }
 
     fn close_keyboard(&mut self) {
         self.osk = None;
+        self.osk_focus = None;
+        self.animate_next = true;
         if let Some(v) = self.view_before_osk.take() {
             self.view = v;
         }
@@ -1320,8 +1419,10 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
         return;
     };
     a.px_per_logical = f.g.raster_scale;
+    a.reduced_motion = app.store.state.settings.reduced_motion;
     a.placement = app.hwplane.is_some() && rdtv_media::ndl::window_bound();
     a.crop = app.hwplane.as_ref().is_some_and(|p| p.can_crop());
+    a.update_view_anim();
     if a.placement && a.hardware() {
         if let Some(p) = app.hwplane.as_mut() {
             p.note_generation(rdtv_media::ndl::window_generation());
@@ -1601,6 +1702,7 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
         Quality(Quality),
         Fps(u32),
         OskPresentation,
+        OskFollow,
         LockOnDisconnect,
         PeerSettings,
         Close,
@@ -1653,6 +1755,13 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
                 ));
                 rows.push(("Zoom out".into(), Act::ZoomOut));
             }
+            rows.push((
+                format!(
+                    "Keyboard follows last click: {}",
+                    if a.settings.osk_follow_click { "on" } else { "off" }
+                ),
+                Act::OskFollow,
+            ));
             rows.push((
                 format!(
                     "Keyboard: {}",
@@ -1849,6 +1958,7 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             a.menu = Menu::None;
         }
         Act::View(m) => {
+            a.animate_next = true;
             a.view.mode = m;
             if m == ViewMode::Fit {
                 a.view.zoom = 1.0;
@@ -1856,6 +1966,7 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             a.save_settings(store);
         }
         Act::ZoomIn => {
+            a.animate_next = true;
             if a.view.mode != ViewMode::Zoom {
                 a.view.mode = ViewMode::Zoom;
                 a.view.zoom = 1.0;
@@ -1868,6 +1979,7 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             a.save_settings(store);
         }
         Act::ZoomOut => {
+            a.animate_next = true;
             a.view.zoom = (a.view.zoom / 1.5).max(1.0);
             if a.view.zoom <= 1.0 {
                 a.view.mode = ViewMode::Fit;
@@ -1942,7 +2054,12 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             a.handle.send(SessionCommand::SetFps(fps));
             a.save_settings(store);
         }
+        Act::OskFollow => {
+            a.settings.osk_follow_click = !a.settings.osk_follow_click;
+            a.save_settings(store);
+        }
         Act::OskPresentation => {
+            a.animate_next = true;
             a.settings.osk_presentation = match a.settings.osk_presentation {
                 OskPresentation::Shrink => OskPresentation::Overlay,
                 OskPresentation::Overlay => OskPresentation::Shrink,
