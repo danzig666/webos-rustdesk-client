@@ -1,0 +1,33 @@
+name: delete releases
+
+# Maintenance: delete GitHub releases (and their tags) whose tag contains a pattern,
+# e.g. the old "-test." pre-releases. Run manually from the Actions tab.
+on:
+  workflow_dispatch:
+    inputs:
+      pattern:
+        description: "Delete every release whose tag contains this text"
+        required: true
+        default: "-test."
+
+permissions:
+  contents: write
+
+jobs:
+  delete:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete matching releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PATTERN: ${{ github.event.inputs.pattern }}
+        run: |
+          if [ -z "$PATTERN" ]; then echo "empty pattern"; exit 1; fi
+          gh release list --limit 200 --json tagName --jq '.[].tagName' > tags.txt
+          grep -F -- "$PATTERN" tags.txt > delete.txt || true
+          echo "Deleting:"; cat delete.txt
+          while read -r tag; do
+            gh release delete "$tag" --yes --cleanup-tag
+          done < delete.txt
+          echo "Remaining:"; gh release list --limit 200
