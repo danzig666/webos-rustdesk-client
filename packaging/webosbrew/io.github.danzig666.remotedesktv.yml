@@ -1,0 +1,36 @@
+title: RemoteDesk TV
+iconUri: https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/icon.png
+# Rewritten by every release (the project's own catalog branch), so the channel picks up
+# updates without this file changing.
+manifestUrl: https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/io.github.danzig666.remotedesktv.manifest.json
+category: utility
+pool: main
+shortDescription: RustDesk-compatible remote desktop client for your computer
+requirements:
+  webosRelease: '>=5'
+description: |
+  Control your Windows, Linux or macOS computer from the sofa. RemoteDesk TV connects **out**
+  to a computer running the normal, unmodified [RustDesk](https://rustdesk.com) app (protocol
+  baseline 1.5.0), through the public RustDesk server, a self-hosted server, or direct IP.
+  Nothing on the TV can be controlled remotely.
+
+  * Magic Remote as the mouse: point, click, wheel scroll, hold OK for right click
+  * Colour buttons: right click, next monitor, mouse/arrow mode, on-screen keyboard
+  * Full on-screen keyboard with US and Hungarian layouts, modifiers, F-keys and shortcuts;
+    the picture follows the field you clicked so you can see what you type
+  * USB/Bluetooth keyboards, including shortcuts with held modifiers (Alt+Tab, Win+E)
+  * Hardware video decoding (H.264, H.265, VP9, AV1) with zoom and keyboard shrink, audio
+  * Remember password, 2FA, accounts and address book where the server provides them
+
+  No root required. Tested on an LG C3 (webOS 23) with a Windows RustDesk host.
+  Community project, not affiliated with RustDesk or LG. Source and issues:
+  https://github.com/danzig666/webos-rustdesk-client
+screenshots:
+  - url: https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/claude/focused-cannon-ufh34u/docs/screenshots/home.png
+    caption: Home with recent computers
+  - url: https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/claude/focused-cannon-ufh34u/docs/screenshots/session-toolbar.png
+    caption: Session toolbar
+  - url: https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/claude/focused-cannon-ufh34u/docs/screenshots/session-keyboard.png
+    caption: On-screen keyboard
+  - url: https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/claude/focused-cannon-ufh34u/docs/screenshots/view-menu.png
+    caption: View menu
