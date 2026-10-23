@@ -16,7 +16,8 @@ Not affiliated with or endorsed by RustDesk or LG.
 ## Install and update with the Homebrew Channel
 
 RemoteDesk TV has its own [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel)
-catalog, updated automatically with every release:
+catalog, updated automatically with every release. Other installers that read Homebrew Channel
+repositories, such as [Glasshouse](https://github.com/rorygallagher2024/glasshouse), can use it too:
 
 ```
 https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/apps.json
