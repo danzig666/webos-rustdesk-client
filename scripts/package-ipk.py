@@ -36,7 +36,9 @@ def gz(data: bytes) -> bytes:
 def make_tar(root: str) -> bytes:
     """Deterministic tar of everything under `root` (sorted, fixed owner and mtime)."""
     buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w", format=tarfile.GNU_FORMAT) as t:
+    # Plain POSIX ustar, like ares-package: no GNU long-name or PAX extension records, which
+    # minimal installers may not read. tarfile raises if a path no longer fits ustar.
+    with tarfile.open(fileobj=buf, mode="w", format=tarfile.USTAR_FORMAT) as t:
         entries = []
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames.sort()
@@ -125,9 +127,24 @@ def main():
             sp = os.path.join(ROOT, src)
             if os.path.exists(sp):
                 shutil.copyfile(sp, os.path.join(appdir, dst))
+        # Per-dependency licence files (hundreds, with long paths) are merged into one text
+        # file so every path in the package stays short and the archive stays small.
+        parts = []
         for ld in a.licenses:
-            if os.path.isdir(ld):
-                shutil.copytree(ld, os.path.join(appdir, "licenses"), dirs_exist_ok=True)
+            if not os.path.isdir(ld):
+                continue
+            for dirpath, dirnames, filenames in os.walk(ld):
+                dirnames.sort()
+                for fname in sorted(filenames):
+                    fp = os.path.join(dirpath, fname)
+                    rel = os.path.relpath(fp, ld)
+                    with open(fp, "rb") as fh:
+                        text = fh.read().decode("utf-8", "replace")
+                    parts.append(f"{'=' * 78}\n{rel}\n{'=' * 78}\n\n{text.rstrip()}\n\n")
+        if parts:
+            with open(os.path.join(appdir, "licenses", "ALL-LICENSES.txt"), "w", encoding="utf-8") as f:
+                f.write("Licence texts of every bundled component, one section per file.\n\n")
+                f.write("".join(parts))
         with open(os.path.join(appdir, "appinfo.json"), "w") as f:
             json.dump(appinfo, f, indent=2)
             f.write("\n")
