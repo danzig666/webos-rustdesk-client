@@ -4,6 +4,11 @@ Baseline remote control must work without root. **This route has not been verifi
 non-rooted TV yet.** If you have one, please follow [NONROOT_CHECKLIST.md](NONROOT_CHECKLIST.md)
 and report the results.
 
+> If this TV runs the [Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel), the
+> easiest install and update route is the project's catalog: see
+> [README → Install and update with the Homebrew Channel](../README.md#install-and-update-with-the-homebrew-channel).
+> The steps below use LG's own developer tools instead.
+
 ## Important about Developer Mode
 
 * Developer Mode sessions expire (shown in the Developer Mode app) and must be renewed. When the

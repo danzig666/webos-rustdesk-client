@@ -10,6 +10,7 @@ mod platform;
 mod screens;
 mod session_view;
 mod ui;
+mod updates;
 mod view;
 
 use std::time::{Duration, Instant};
@@ -33,7 +34,7 @@ fn run() -> anyhow::Result<()> {
     let log_path = platform::init_logging(&data);
     log::info!(
         "RemoteDesk TV {} starting (args: {} launch params)",
-        env!("CARGO_PKG_VERSION"),
+        updates::current_version(),
         std::env::args().count().saturating_sub(1)
     );
     platform::confine_upstream_config(&data);

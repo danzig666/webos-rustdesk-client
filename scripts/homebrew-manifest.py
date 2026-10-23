@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Write a webOS Homebrew Channel repository manifest for a built IPK
 (format used by repo.webosbrew.org: id, version, type, title, iconUri, sourceUrl,
-rootRequired, ipkUrl, ipkHash). Submission to a catalog is a separate, manual step."""
+rootRequired, ipkUrl, ipkHash). scripts/homebrew-repo.py publishes it in the project's own
+catalog (the homebrew-repo branch)."""
 import argparse
 import hashlib
 import json
 
 REPO = "https://github.com/danzig666/webos-rustdesk-client"
+CATALOG = "https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo"
 
 
 def main():
@@ -24,8 +26,8 @@ def main():
         "version": a.version,
         "type": "native",
         "title": "RemoteDesk TV",
-        "appDescription": "RustDesk-compatible remote desktop client (community project, test build)",
-        "iconUri": f"{REPO}/raw/{a.tag}/packaging/webos/icon_large.png",
+        "appDescription": "RustDesk-compatible remote desktop client (community project)",
+        "iconUri": f"{CATALOG}/icon.png",
         "sourceUrl": REPO,
         "rootRequired": False,
         "ipkUrl": f"{REPO}/releases/download/{a.tag}/{name}",

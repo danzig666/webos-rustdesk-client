@@ -16,7 +16,10 @@ use rdtv_core::{
 use sdl2::{pixels::Color, rect::Rect};
 use std::time::Instant;
 
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = match option_env!("RDTV_VERSION") {
+    Some(v) => v,
+    None => env!("CARGO_PKG_VERSION"),
+};
 pub const UPSTREAM: &str = "RustDesk 1.5.0 (fada664df7a294d1d1a9ca3e7cd3637069122f17)";
 
 #[derive(Default, Clone)]
@@ -150,6 +153,23 @@ fn home(app: &mut App, f: &mut Frame) {
     }
     if f.button(id("home-help"), r(W - 80 - 150, 40, 150, 70), "Help", false) {
         app.go(Screen::Help);
+    }
+    // Newer version in the Homebrew Channel catalog: one button to go and update.
+    if let Some(latest) = app.updates.available().map(str::to_owned) {
+        let label = format!("Update {latest} available");
+        let uw = (f.g.text_width(&label, size::BODY, true) + 60).min(W - 80 - sw - 340 - 20 - 520);
+        if uw > 200
+            && f.button(
+                id("home-update"),
+                r(W - 80 - sw - 340 - 20 - uw, 40, uw, 70),
+                &label,
+                true,
+            )
+        {
+            if let Err(e) = crate::updates::open_hbchannel(false) {
+                app.toast(format!("Open the Homebrew Channel to update ({e})"));
+            }
+        }
     }
 
     // Connect panel.
@@ -425,6 +445,16 @@ fn settings(app: &mut App, f: &mut Frame) {
             "Reduced motion".into(),
             if s.reduced_motion { 2 } else { 1 },
         ),
+        (
+            "set-updates",
+            "Check for updates (asks GitHub once per start)".into(),
+            if s.check_updates { 2 } else { 1 },
+        ),
+        (
+            "set-catalog",
+            "Add the RemoteDesk catalog to the Homebrew Channel (for updates)".into(),
+            0,
+        ),
         ("set-scale", format!("Interface size: {scale_label}"), 0),
         ("set-clear", "Clear history for this server".into(), 0),
         (
@@ -468,6 +498,20 @@ fn settings(app: &mut App, f: &mut Frame) {
         }
         "set-chord" => st.escape_chord_enabled = !st.escape_chord_enabled,
         "set-motion" => st.reduced_motion = !st.reduced_motion,
+        "set-updates" => {
+            st.check_updates = !st.check_updates;
+            if st.check_updates {
+                app.updates.start(&app.rt);
+            }
+        }
+        "set-catalog" => {
+            if let Err(e) = crate::updates::open_hbchannel(true) {
+                app.toast(format!(
+                    "{e}. In the Homebrew Channel: Settings → Add repository → {}",
+                    crate::updates::CATALOG_URL
+                ));
+            }
+        }
         "set-scale" => {
             st.ui_scale = match (st.ui_scale * 100.0).round() as i32 {
                 85 => 1.0,
@@ -989,6 +1033,22 @@ pub fn diagnostics_text(app: &App) -> String {
             "none yet".to_owned()
         } else {
             keys.join("  ")
+        }
+    ));
+    s.push_str(&format!(
+        "Version {VERSION} · catalog: {}\n",
+        if !app.store.state.settings.check_updates {
+            "update check off".to_owned()
+        } else if let Some(l) = &app.updates.latest {
+            if crate::updates::is_newer(l, VERSION) {
+                format!("{l} available")
+            } else {
+                format!("up to date ({l})")
+            }
+        } else if let Some(e) = &app.updates.error {
+            format!("check failed ({e})")
+        } else {
+            "checking…".to_owned()
         }
     ));
     s.push_str(&format!(

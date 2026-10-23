@@ -4,23 +4,28 @@ For TVs rooted with a supported method and running the
 [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel). The app does **not**
 need root to run. Root is only used here to install a package from a file.
 
-> Test build: picture, keys, audio and hardware decoding have not been verified on a TV yet. Please
-> report results (see [NONROOT_CHECKLIST.md](NONROOT_CHECKLIST.md), which also applies to rooted TVs).
+## Recommended: the RemoteDesk catalog in the Homebrew Channel
 
-## 1. Download
+The project publishes its own Homebrew Channel catalog with every release:
 
-From the repository's **Releases** page download
-`io.github.danzig666.remotedesktv_<version>_arm.ipk` and `SHA256SUMS.txt`, then check the hash:
-
-```powershell
-# Windows PowerShell
-(Get-FileHash .\io.github.danzig666.remotedesktv_0.1.0_arm.ipk -Algorithm SHA256).Hash
+```
+https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/apps.json
 ```
 
-The checksum only detects a damaged download. Trust comes from downloading over HTTPS from this
-GitHub repository's release page.
+1. Homebrew Channel → **Settings → Add repository** → enter the URL.
+2. Back in the app list, open **RemoteDesk TV** → **Install**. The Homebrew Channel checks the
+   package's SHA-256 from the catalog before installing.
+3. To update, open the app's page in the Homebrew Channel and choose **Update**. RemoteDesk TV
+   checks the catalog once per start and shows **Update … available** on Home, which opens the
+   Homebrew Channel (Settings → "Check for updates" turns this off).
 
-## 2. Install
+If you installed from an `.ipk` first, RemoteDesk TV → **Settings → Add the RemoteDesk catalog to
+the Homebrew Channel** opens the Homebrew Channel with the URL already filled in.
+
+## Other ways: install the `.ipk` file
+
+Download `io.github.danzig666.remotedesktv_<version>_arm.ipk` from the repository's **Releases**
+page (over HTTPS from this GitHub repository).
 
 ### Option A: webOS Dev Manager (Windows/macOS/Linux GUI)
 
@@ -39,20 +44,15 @@ ssh root@<TV-IP> 'luna-send -w 20000 -i luna://com.webos.appInstallService/dev/i
 Wait until the reply contains `"state":"installed"`, then press Ctrl+C. The helper script
 [tools/Install-RemoteDeskTV.ps1](../tools/Install-RemoteDeskTV.ps1) does the same from Windows.
 
-### Option C: Homebrew Channel repository
-
-Each release ships `io.github.danzig666.remotedesktv.manifest.json`, prepared for a Homebrew
-repository. The app has **not** been submitted to the official webosbrew catalog. Until it is, use
-option A or B.
-
-## 3. Launch
+## Launch
 
 Open **RemoteDesk TV** from the launcher. Always launch it through the launcher, not from an SSH
 shell: hardware video only works for apps started by the TV's app manager.
 
 ## Update
 
-Install the newer `.ipk` the same way. Settings, profiles and saved passwords are kept in the app's
+With the catalog: **Update** on the app's page in the Homebrew Channel. Otherwise install the newer
+`.ipk` the same way. Settings, profiles and saved passwords are kept in the app's
 `data/` directory. If an installer ever removes the app directory, they are lost; see
 [SECURITY.md](SECURITY.md) for what is stored.
 

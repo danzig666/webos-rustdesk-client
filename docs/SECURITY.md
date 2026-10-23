@@ -70,6 +70,8 @@ These rules are unchanged from upstream `Client::secure_connection`:
 - There is no inbound listener of any kind, and no service or helper.
 - The app runs as the normal launcher-started user and needs no root. It never modifies the TV's jail, firmware, picture or audio settings, or other apps.
 - On a rooted TV the app still runs unprivileged when launched normally. The diagnostics screen reports the uid.
+- Update check: once per start the app fetches the catalog manifest from `raw.githubusercontent.com` (HTTPS, certificate verified, no identifiers sent beyond what any HTTPS request carries). Settings → "Check for updates" turns it off. Installing updates is always done by the Homebrew Channel, never by the app itself.
+- "Add the RemoteDesk catalog to the Homebrew Channel" only launches the Homebrew Channel (via `luna-send-pub`, the public bus) with its documented `addRepository` launch parameter; you confirm the repository there.
 
 ## Reporting issues
 

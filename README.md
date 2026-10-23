@@ -13,6 +13,24 @@ sofa with the Magic Remote, a regular remote, or a USB/Bluetooth mouse and keybo
 
 Not affiliated with or endorsed by RustDesk or LG.
 
+## Install and update with the Homebrew Channel
+
+RemoteDesk TV has its own [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel)
+catalog, updated automatically with every release:
+
+```
+https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/apps.json
+```
+
+1. In the Homebrew Channel: **Settings → Add repository**, enter the URL above.
+2. **RemoteDesk TV** appears in the app list: open it and choose **Install**.
+3. Updates: when a new version is out, RemoteDesk TV shows **Update … available** on its Home
+   screen; it opens the Homebrew Channel, where the app's page offers **Update**.
+
+Already installed from an `.ipk`? **Settings → Add the RemoteDesk catalog to the Homebrew Channel**
+opens the Homebrew Channel with the URL filled in. Other ways to install (Dev Manager, SSH,
+Developer Mode with `ares-install`) are in [Install](#install) below.
+
 ## Screenshots
 
 | | |

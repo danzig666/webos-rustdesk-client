@@ -105,6 +105,9 @@ jobs:
       - name: Build C media libraries + SDL2 webOS backport
         run: scripts/build-deps.sh webos
       - name: Cross-compile
+        env:
+          # The version the app reports (About, update check) = the package version.
+          RDTV_VERSION: ${{ steps.ver.outputs.version }}
         run: cargo build --locked --release --target armv7-unknown-linux-gnueabi -p rdtv-app
       - name: ELF / ABI audit
         run: scripts/elf-audit.sh target/armv7-unknown-linux-gnueabi/release/remotedesk-tv deps-out/webos/lib/libSDL2-2.0.so.0 | tee elf-audit.txt
@@ -177,3 +180,16 @@ jobs:
           notes=docs/RELEASE_NOTES.md
           gh release view "$tag" >/dev/null 2>&1 && gh release delete "$tag" --yes --cleanup-tag=false
           gh release create "$tag" dist/*.ipk dist/*-source.tar.gz --target "$GITHUB_SHA" --title "RemoteDesk TV ${tag}" --notes-file "$notes"
+      - name: Publish the Homebrew Channel catalog (homebrew-repo branch)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/homebrew-repo.py --manifest dist/*.manifest.json \
+            --icon packaging/webos/icon_large.png --out build/catalog
+          cd build/catalog
+          git init -q -b homebrew-repo
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Catalog for $(python3 -c 'import json;print(json.load(open("apps.json"))["packages"][0]["manifest"]["version"])')"
+          # Generated content only: the branch is replaced on every release.
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" homebrew-repo

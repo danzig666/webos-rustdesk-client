@@ -196,6 +196,8 @@ pub struct AppSettings {
     /// and zoom also work with hardware decoding (falls back to full-screen on failure).
     pub hw_picture_placement: bool,
     pub audio_enabled_default: bool,
+    /// Check the project's Homebrew Channel catalog for a newer version once per start.
+    pub check_updates: bool,
 }
 
 impl Default for AppSettings {
@@ -209,6 +211,7 @@ impl Default for AppSettings {
             prefer_hardware_decoding: true,
             hw_picture_placement: true,
             audio_enabled_default: true,
+            check_updates: true,
         }
     }
 }

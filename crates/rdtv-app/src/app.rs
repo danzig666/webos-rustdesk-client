@@ -147,6 +147,7 @@ pub struct App {
     /// Experimental hardware picture placement (exported video window).
     pub hwplane: Option<crate::hwplane::HwPlane>,
     pub hwplane_error: Option<String>,
+    pub updates: crate::updates::UpdateState,
 }
 
 /// Leaving the app: stop input at once; disconnect when focus has not come back after this
@@ -177,7 +178,7 @@ impl App {
         if screen == Screen::Home {
             ui.want_focus = Some(crate::ui::id("home-target"));
         }
-        App {
+        let mut app = App {
             store,
             screen: screen.clone(),
             prev_screen: screen,
@@ -206,7 +207,12 @@ impl App {
             toast: None,
             hwplane: None,
             hwplane_error: None,
+            updates: Default::default(),
+        };
+        if app.store.state.settings.check_updates {
+            app.updates.start(&app.rt);
         }
+        app
     }
 
     pub fn now_ms(&self) -> u64 {
@@ -560,6 +566,7 @@ impl App {
     // ----- frame -------------------------------------------------------------------------
 
     pub fn update(&mut self, inputs: Vec<In>) {
+        self.updates.poll();
         while let Ok(m) = self.rx.try_recv() {
             match m {
                 AppMsg::Session(g, e) => self.handle_session_event(g, e),
