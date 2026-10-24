@@ -1,0 +1,31 @@
+{
+  "paging": {
+    "page": 1,
+    "count": 1,
+    "maxPage": 1,
+    "itemsTotal": 1
+  },
+  "packages": [
+    {
+      "id": "io.github.danzig666.remotedesktv",
+      "title": "RemoteDesk TV",
+      "iconUri": "https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/icon.png",
+      "shortDescription": "Control your computer from the TV with the regular RustDesk app: Magic Remote mouse, full on-screen keyboard (US/Hungarian), hardware video, audio. Community project, not affiliated with RustDesk or LG.",
+      "manifestUrl": "io.github.danzig666.remotedesktv.manifest.json",
+      "manifest": {
+        "id": "io.github.danzig666.remotedesktv",
+        "version": "0.4.1",
+        "type": "native",
+        "title": "RemoteDesk TV",
+        "appDescription": "RustDesk-compatible remote desktop client (community project)",
+        "iconUri": "https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/icon.png",
+        "sourceUrl": "https://github.com/danzig666/webos-rustdesk-client",
+        "rootRequired": false,
+        "ipkUrl": "https://github.com/danzig666/webos-rustdesk-client/releases/download/v0.4.1/io.github.danzig666.remotedesktv_0.4.1_arm.ipk",
+        "ipkHash": {
+          "sha256": "5668edabc2988dff750b48230458f2f5539fe6381786d5cb89d36636fea59962"
+        }
+      }
+    }
+  ]
+}
