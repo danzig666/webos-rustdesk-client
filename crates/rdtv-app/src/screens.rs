@@ -230,11 +230,11 @@ fn home(app: &mut App, f: &mut Frame) {
     }
 
     // Lists.
-    let tabs = ["Favorites", "Recent", "Address book"];
-    let tab = app.account_form.home_tab.min(2);
+    let tabs = ["Favorites", "Recent", "Address book", "Nearby"];
+    let tab = app.account_form.home_tab.min(3);
     let mut tx = 780;
     for (i, name) in tabs.iter().enumerate() {
-        let tw = f.g.text_width(name, size::BODY, true) + 48;
+        let tw = f.g.text_width(name, size::BODY, true) + 36;
         let rr = r(tx, 150, tw, 70);
         let (foc, act) = f.register(idx("home-tab", i), rr);
         f.g.round(
@@ -260,7 +260,7 @@ fn home(app: &mut App, f: &mut Frame) {
     let search = app.search.clone();
     if f.field(
         id("home-search"),
-        r(1520, 140, 320, 90),
+        r(1600, 140, 240, 90),
         "Search",
         &search,
         false,
@@ -271,8 +271,47 @@ fn home(app: &mut App, f: &mut Frame) {
     }
     let q = app.search.to_lowercase();
     let mut items: Vec<HomeItem> = Vec::new();
+    if tab == 3 {
+        // Search the LAN when the tab is opened, and again if the last result is old.
+        let stale = app
+            .lan
+            .started
+            .is_none_or(|t| t.elapsed() > std::time::Duration::from_secs(60));
+        if !app.lan.scanning() && stale {
+            app.start_lan_scan();
+        }
+    }
     let saved = |id: &str| app.store.remembered_password(&profile.id, id).is_some();
     match tab {
+        3 => {
+            for p in &app.lan.peers {
+                let rec = pdata.peers.get(&p.id).cloned().unwrap_or_default();
+                let title = if !rec.alias.is_empty() {
+                    rec.alias.clone()
+                } else if !p.hostname.is_empty() {
+                    p.hostname.clone()
+                } else {
+                    p.id.clone()
+                };
+                let mut sub = vec![format!("ID {}", p.id)];
+                if !p.username.is_empty() {
+                    sub.push(p.username.clone());
+                }
+                if !p.platform.is_empty() {
+                    sub.push(p.platform.clone());
+                }
+                sub.push(p.ip.to_string());
+                if saved(&p.id) {
+                    sub.push("password saved".into());
+                }
+                items.push(HomeItem {
+                    id: p.id.clone(),
+                    title,
+                    subtitle: sub.join(" · "),
+                    favorite: rec.favorite,
+                });
+            }
+        }
         0 | 1 => {
             let ids: Vec<String> = if tab == 0 {
                 pdata
@@ -357,6 +396,9 @@ fn home(app: &mut App, f: &mut Frame) {
         let msg = match tab {
             0 => "No favorites yet. Open ⋯ next to a recent computer to add it.",
             1 => "No recent connections on this server profile yet.",
+            3 if app.lan.scanning() => "Looking for RustDesk computers on this network…",
+            3 if app.lan.error.is_some() => "The network search did not work on this TV.",
+            3 => "No RustDesk computers answered. They need RustDesk running, on the same network, with Settings → Security → \"Enable LAN discovery\" on (the default), and the firewall allowing RustDesk.",
             _ => {
                 if app.store.token(&profile.id).is_some() {
                     "The address book is empty or not loaded. Open Account & address book to refresh."
@@ -402,6 +444,16 @@ fn home(app: &mut App, f: &mut Frame) {
             false,
             theme::TEXT_DIM,
         );
+    }
+    if tab == 3 {
+        let label = if app.lan.scanning() {
+            "Searching…"
+        } else {
+            "Search again"
+        };
+        if f.button(id("home-lan-rescan"), r(1520, 962, 320, 56), label, false) && !app.lan.scanning() {
+            app.start_lan_scan();
+        }
     }
     footer(f, "0-9: type an ID · OK: connect · ⋯: options · Back: exit");
 }
@@ -1768,17 +1820,19 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
             let pid = app.store.state.active_profile.clone();
             let rec = app.store.peer(&pid, &peer);
             let saved = app.store.remembered_password(&pid, &peer).is_some();
-            let panel = r(560, 160, 800, 760);
+            let panel = r(560, 110, 800, 860);
             f.g.round(panel, 28, theme::PANEL);
-            let title = if rec.alias.is_empty() {
-                peer.clone()
-            } else {
+            let title = if !rec.alias.is_empty() {
                 rec.alias.clone()
+            } else if !rec.hostname.is_empty() {
+                format!("{} ({peer})", rec.hostname)
+            } else {
+                peer.clone()
             };
-            f.g.text_fit(&title, 610, 200, size::TITLE, true, theme::TEXT, 700);
-            let mut y = 280;
+            f.g.text_fit(&title, 610, 150, size::TITLE, true, theme::TEXT, 700);
+            let mut y = 230;
             let mut act = None;
-            let items = [
+            let mut items = vec![
                 ("pm-connect", "Connect".to_owned()),
                 (
                     "pm-fav",
@@ -1800,6 +1854,9 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
                 ),
                 ("pm-remove", "Remove from recent".into()),
             ];
+            if !rec.mac.is_empty() {
+                items.insert(1, ("pm-wake", "Wake up (Wake-on-LAN)".into()));
+            }
             for (k, label) in items.iter() {
                 if f.button(id(k), r(610, y, 700, 86), label, *k == "pm-connect") {
                     act = Some(*k);
@@ -1813,6 +1870,13 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
                     app.request_connect(&peer, None);
                     return;
                 }
+                Some("pm-wake") => match rdtv_core::lan::wake(&rec.mac) {
+                    Ok(()) => app.toast(format!(
+                        "Wake-up sent to {}. A computer can take a minute to start.",
+                        rec.mac
+                    )),
+                    Err(e) => app.toast(format!("Wake-up failed: {e}")),
+                },
                 Some("pm-fav") => {
                     let r = app.store.peer_mut(&pid, &peer);
                     r.favorite = !r.favorite;

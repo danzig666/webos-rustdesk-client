@@ -22,6 +22,7 @@ CI (cross-compile, ELF/ABI audit, emulated self-test, IPK verification). Please 
 * Full on-screen keyboard: US and Hungarian layouts, Ctrl/Alt/AltGr/Shift/Win (once or locked), F-keys, numpad, per-computer shortcuts, Ctrl+Alt+Del.
 * Fit, 1:1 and zoom; keyboard shrink or overlay.
 * Default disconnect when leaving the app, with Reconnect; optional keep-connected; 30 s automatic reconnect.
+* Nearby tab: RustDesk computers on the local network; Wake-on-LAN from a computer's ⋯ menu.
 * Accounts and address book where the server provides them.
 * USB/Bluetooth keyboards: shortcuts with held modifiers (Alt+Tab, Win+E, Ctrl+C) and special keys.
 

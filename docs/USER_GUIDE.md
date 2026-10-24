@@ -26,6 +26,13 @@ computers it talks to. Without it, connections still work but are not verified e
   and OK (on **Done**) connects.
 * **Favorites / Recent / Address book** tabs: OK connects; **⋯** opens options (favourite, rename,
   computer settings, forget saved password, remove from recent).
+* **Nearby** tab: lists the RustDesk computers on your home network (name, user, platform, IP),
+  found within a few seconds; OK connects. A computer appears when RustDesk runs on it, it is on
+  the same network, its RustDesk setting Security → "Enable LAN discovery" is on (the default) and
+  its firewall lets RustDesk answer. **Search again** repeats the search.
+* **Wake up (Wake-on-LAN)** in a computer's **⋯** menu, once it has been seen in Nearby (that is how
+  the TV learns its network card address). The computer must have Wake-on-LAN enabled in its
+  BIOS/UEFI and network adapter settings and be connected by cable on most PCs.
 * **Server:** button: switch server profile. Each profile has its own favourites, history, saved
   passwords and account. The same ID on two servers shares nothing.
 * **Account & address book**: sign in when your server provides accounts (RustDesk Pro or a

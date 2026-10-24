@@ -62,6 +62,7 @@ the screens look the same.
   lock-on-disconnect.
 * Leaving the app disconnects by default (one-press Reconnect on return); optional
   keep-connected; 30-second automatic reconnect after unexpected drops.
+* **Nearby**: finds the RustDesk computers on your home network, and **Wake-on-LAN** wakes them.
 * Accounts and address book when your server provides them.
 * Out of scope by design: file transfer, clipboard sync, chat, recording, terminal, tunnels,
   multiple sessions, incoming control of the TV.

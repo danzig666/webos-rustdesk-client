@@ -148,11 +148,29 @@ pub struct App {
     pub hwplane: Option<crate::hwplane::HwPlane>,
     pub hwplane_error: Option<String>,
     pub updates: crate::updates::UpdateState,
+    pub lan: LanScan,
 }
 
 /// Leaving the app: stop input at once; disconnect when focus has not come back after this
 /// grace period (a transient system overlay does not count as leaving).
 const BACKGROUND_GRACE: Duration = Duration::from_millis(2500);
+
+/// LAN discovery state for the Home "Nearby" tab.
+#[derive(Default)]
+pub struct LanScan {
+    slot: Option<std::sync::Arc<std::sync::Mutex<Option<Result<Vec<rdtv_core::lan::LanPeer>, String>>>>>,
+    pub started: Option<Instant>,
+    pub peers: Vec<rdtv_core::lan::LanPeer>,
+    pub error: Option<String>,
+    /// At least one scan has finished.
+    pub done: bool,
+}
+
+impl LanScan {
+    pub fn scanning(&self) -> bool {
+        self.slot.is_some()
+    }
+}
 
 impl App {
     pub fn new(sdl: sdl2::Sdl, store: Store, log_path: std::path::PathBuf) -> App {
@@ -208,6 +226,7 @@ impl App {
             hwplane: None,
             hwplane_error: None,
             updates: Default::default(),
+            lan: Default::default(),
         };
         if app.store.state.settings.check_updates {
             app.updates.start(&app.rt);
@@ -227,6 +246,67 @@ impl App {
             self.prev_screen = std::mem::replace(&mut self.screen, s);
             self.ui.reset = true;
         }
+    }
+
+    /// Start a LAN discovery scan unless one is running.
+    pub fn start_lan_scan(&mut self) {
+        if self.lan.slot.is_some() {
+            return;
+        }
+        let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+        self.lan.slot = Some(slot.clone());
+        self.lan.started = Some(Instant::now());
+        self.rt.spawn_blocking(move || {
+            let r =
+                rdtv_core::lan::discover(std::time::Duration::from_millis(2500)).map_err(|e| e.to_string());
+            if let Ok(mut g) = slot.lock() {
+                *g = Some(r);
+            }
+        });
+    }
+
+    fn poll_lan(&mut self) {
+        let Some(slot) = &self.lan.slot else { return };
+        let Some(r) = slot.lock().ok().and_then(|mut g| g.take()) else {
+            return;
+        };
+        self.lan.slot = None;
+        match r {
+            Ok(peers) => {
+                log::info!("LAN discovery: {} computer(s)", peers.len());
+                // Remember each computer's MAC (Wake-on-LAN) and name for its saved entry.
+                let pid = self.store.state.active_profile.clone();
+                let mut changed = false;
+                for p in &peers {
+                    if p.mac.is_empty() && p.hostname.is_empty() {
+                        continue;
+                    }
+                    let r = self.store.peer_mut(&pid, &p.id);
+                    if !p.mac.is_empty() && r.mac != p.mac {
+                        r.mac = p.mac.clone();
+                        changed = true;
+                    }
+                    if r.hostname.is_empty() && !p.hostname.is_empty() {
+                        r.hostname = p.hostname.clone();
+                        changed = true;
+                    }
+                    if r.platform.is_empty() && !p.platform.is_empty() {
+                        r.platform = p.platform.clone();
+                        changed = true;
+                    }
+                }
+                if changed {
+                    self.store.save();
+                }
+                self.lan.peers = peers;
+                self.lan.error = None;
+            }
+            Err(e) => {
+                log::warn!("LAN discovery failed: {e}");
+                self.lan.error = Some(e);
+            }
+        }
+        self.lan.done = true;
     }
 
     pub fn toast(&mut self, s: impl Into<String>) {
@@ -567,6 +647,7 @@ impl App {
 
     pub fn update(&mut self, inputs: Vec<In>) {
         self.updates.poll();
+        self.poll_lan();
         while let Ok(m) = self.rx.try_recv() {
             match m {
                 AppMsg::Session(g, e) => self.handle_session_event(g, e),

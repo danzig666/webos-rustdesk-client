@@ -170,6 +170,8 @@ pub struct PeerRecord {
     /// Informational, from the last PeerInfo: hostname / platform.
     pub hostname: String,
     pub platform: String,
+    /// Network card address from LAN discovery ("aa:bb:…"), for Wake-on-LAN.
+    pub mac: String,
     pub settings: PeerSettings,
 }
 

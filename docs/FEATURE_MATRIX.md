@@ -57,4 +57,5 @@ yet. Every TV-dependent item is "implemented but unverified" until the
 | Microphone, voice calls, gamepads | — | — | not implemented | — | — | — | **excluded by owner** | — |
 | HDR, 120 Hz, gaming input capture | — | — | no HDR metadata, SDR only | — | — | — | **excluded by owner** | — |
 | Incoming TV hosting / root-only integration | — | — | no listener, no root features | — | — | — | **excluded from scope** | — |
-| Enterprise admin/SSO, virtual displays, LAN discovery/WoL UI | — | — | not implemented | — | — | — | not release requirements | — |
+| LAN discovery + Wake-on-LAN | `PeerDiscovery` ping/pong on UDP 21119 (`src/lan.rs`), magic packet (`send_wol`) | host "Enable LAN discovery" (default on); WoL enabled on the PC | `rdtv-core/src/lan.rs`, Home "Nearby" tab, peer menu "Wake up" | UDP broadcast from the app | both | Home → Nearby, ⋯ → Wake up | **verified** against a stock RustDesk 1.5.0 Linux host (discovery, magic packet on the wire); TV unverified | `lan::tests` |
+| Enterprise admin/SSO, virtual displays | — | — | not implemented | — | — | — | not release requirements | — |

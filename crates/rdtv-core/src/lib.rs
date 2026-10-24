@@ -5,6 +5,7 @@ pub mod account;
 pub mod http;
 pub mod input;
 pub mod keymap;
+pub mod lan;
 pub mod profile;
 pub mod reconnect;
 pub mod session;
