@@ -1223,7 +1223,7 @@ It is not made, endorsed or supported by RustDesk, Purslane Ltd., LG Electronics
 License: GNU AGPL-3.0. Source code: https://github.com/danzig666/webos-rustdesk-client\n\
 Protocol implementation reuses {UPSTREAM} (hbb_common and base crates, AGPL-3.0) and code ported from its client.\n\n\
 Third-party components: SDL2 webOS port by webosbrew (zlib), libvpx (BSD-3-Clause), libopus (BSD-3-Clause), \
-DejaVu fonts (Bitstream Vera / public domain), fontdue (MIT/Apache-2.0), rustls, ring, tokio, protobuf and other Rust crates \
+Inter font (SIL Open Font License 1.1), DejaVu fonts (Bitstream Vera / public domain), fontdue (MIT/Apache-2.0), rustls, ring, tokio, protobuf and other Rust crates \
 (see THIRD-PARTY-NOTICES.txt in the package). Hardware decoding uses the TV's own NDL DirectMedia library, which is not shipped with this app."
     );
     f.panel(r(80, 170, 1760, 720));

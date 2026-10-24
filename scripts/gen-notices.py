@@ -22,8 +22,10 @@ C_COMPONENTS = [
      "url": "https://www.openssl.org", "how": "statically linked (TLS used by upstream hbb_common)"},
     {"name": "libsodium (via libsodium-sys)", "version": "1.0.x (bundled)", "license": "ISC",
      "url": "https://libsodium.org", "how": "statically linked (RustDesk key exchange)"},
+    {"name": "Inter (Regular, SemiBold)", "version": "4.1", "license": "OFL-1.1",
+     "url": "https://github.com/rsms/inter", "how": "embedded in the executable (interface font)"},
     {"name": "DejaVu fonts", "version": "2.37", "license": "Bitstream-Vera AND LicenseRef-Public-Domain",
-     "url": "https://dejavu-fonts.github.io", "how": "embedded in the executable"},
+     "url": "https://dejavu-fonts.github.io", "how": "embedded in the executable (symbol fallback)"},
 ]
 
 

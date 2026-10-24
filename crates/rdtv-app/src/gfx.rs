@@ -1,5 +1,5 @@
 //! Rendering helpers over the SDL2 renderer: theme colours, rounded rectangles and a
-//! glyph-cached text renderer (fontdue, DejaVu Sans). All coordinates are in the 1920x1080
+//! glyph-cached text renderer (fontdue; Inter, DejaVu Sans for missing symbols). All coordinates are in the 1920x1080
 //! logical UI space; SDL's logical size maps them to the real drawable.
 
 use fontdue::{Font, FontSettings};
@@ -56,6 +56,9 @@ pub struct Gfx {
     pub tc: &'static TextureCreator<WindowContext>,
     regular: Font,
     bold: Font,
+    /// DejaVu Sans, for symbols Inter does not have (⋯ ★ ⌫ ⏎ ⌄ …).
+    fallback: Font,
+    fallback_bold: Font,
     glyphs: HashMap<(char, u32, bool), Glyph>,
     circle: Texture<'static>,
     rings: HashMap<(i32, i32), Texture<'static>>,
@@ -64,8 +67,11 @@ pub struct Gfx {
     pub ui_scale: f32,
 }
 
-static REGULAR_TTF: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
-static BOLD_TTF: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-Bold.ttf");
+// Inter (SIL OFL 1.1): Regular for text, SemiBold for emphasis.
+static REGULAR_TTF: &[u8] = include_bytes!("../assets/fonts/Inter-Regular.ttf");
+static BOLD_TTF: &[u8] = include_bytes!("../assets/fonts/Inter-SemiBold.ttf");
+static FALLBACK_TTF: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
+static FALLBACK_BOLD_TTF: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-Bold.ttf");
 
 impl Gfx {
     pub fn new(mut canvas: Canvas<Window>) -> anyhow::Result<Gfx> {
@@ -79,12 +85,17 @@ impl Gfx {
         let tc: &'static TextureCreator<WindowContext> = Box::leak(Box::new(canvas.texture_creator()));
         let regular = Font::from_bytes(REGULAR_TTF, FontSettings::default()).map_err(anyhow::Error::msg)?;
         let bold = Font::from_bytes(BOLD_TTF, FontSettings::default()).map_err(anyhow::Error::msg)?;
+        let fallback = Font::from_bytes(FALLBACK_TTF, FontSettings::default()).map_err(anyhow::Error::msg)?;
+        let fallback_bold =
+            Font::from_bytes(FALLBACK_BOLD_TTF, FontSettings::default()).map_err(anyhow::Error::msg)?;
         let circle = make_circle(tc, 64)?;
         Ok(Gfx {
             canvas,
             tc,
             regular,
             bold,
+            fallback,
+            fallback_bold,
             glyphs: HashMap::new(),
             circle,
             rings: HashMap::new(),
@@ -197,7 +208,14 @@ impl Gfx {
     fn glyph(&mut self, ch: char, px: f32, bold: bool) -> &Glyph {
         let key = (ch, (px * 4.0) as u32, bold);
         if !self.glyphs.contains_key(&key) {
-            let font = if bold { &self.bold } else { &self.regular };
+            let main = if bold { &self.bold } else { &self.regular };
+            let font = if main.lookup_glyph_index(ch) != 0 || ch == ' ' {
+                main
+            } else if bold {
+                &self.fallback_bold
+            } else {
+                &self.fallback
+            };
             let rpx = px * self.raster_scale;
             let (m, bitmap) = font.rasterize(ch, rpx);
             let tex = if m.width > 0 && m.height > 0 {

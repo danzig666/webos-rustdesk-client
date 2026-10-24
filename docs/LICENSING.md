@@ -16,7 +16,8 @@ RemoteDesk TV is licensed under **AGPL-3.0-only** (`LICENSE`). The reason is tha
 | libopus 1.5.2 | static | BSD-3-Clause | yes | `licenses/ALL-LICENSES.txt` (section `opus/COPYING`) |
 | OpenSSL 3.x (`openssl-src`, vendored) | static, pulled in by upstream `native-tls` | Apache-2.0 | yes (Apache-2.0 is GPLv3-compatible) | License files shipped from the crate |
 | libsodium (`libsodium-sys`) | static | ISC | yes | `licenses/ALL-LICENSES.txt` (sections `crates/libsodium-sys-*`) |
-| DejaVu Sans fonts | embedded | Bitstream Vera license + public domain changes | yes | `licenses/LICENSE-DejaVu.txt`. Font name and redistribution terms are respected; the fonts are not renamed. |
+| Inter 4.1 (Regular, SemiBold), interface font | embedded | SIL Open Font License 1.1 | yes | `licenses/LICENSE-Inter.txt`. Unmodified font files, bundled with software (allowed by OFL), not sold on their own, name not used for a modified version. |
+| DejaVu Sans fonts (symbol fallback) | embedded | Bitstream Vera license + public domain changes | yes | `licenses/LICENSE-DejaVu.txt`. Font name and redistribution terms are respected; the fonts are not renamed. |
 | fontdue, rustls, ring, tokio, protobuf and the other ~250 Rust crates | static | MIT / Apache-2.0 / BSD / ISC / Zlib / Unicode / MPL-2.0 (per crate) | yes | `THIRD-PARTY-NOTICES.txt` plus every crate's LICENSE, COPYING and NOTICE text in `licenses/ALL-LICENSES.txt`, one section per file (collected by `scripts/gen-notices.py`). An SBOM (`sbom.cdx.json`) is part of each release build's workflow artifact. |
 | punktfunk/client-webos | approach only: toolchain flags, glibc shim idea, NDL dlopen/state handling | MIT OR Apache-2.0 | yes | Re-implemented with attribution in source comments and `SOURCES.md`; no files were copied |
 | mariotaku/ss4s | approach only: video-only NDL load, ms PTS | LGPL-3.0 | n/a (no code used) | Re-implemented independently in Rust |

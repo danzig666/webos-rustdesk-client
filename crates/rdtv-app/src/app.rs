@@ -529,7 +529,8 @@ impl App {
                 self.modal = Some(Modal::Password {
                     wrong,
                     value: String::new(),
-                    remember: false,
+                    // Remembering is the default; switch it off in the dialog for a one-off login.
+                    remember: true,
                 });
                 self.ui.want_focus = Some(crate::ui::id("pw-field"));
             }

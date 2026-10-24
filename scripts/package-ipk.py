@@ -123,6 +123,7 @@ def main():
             ("LICENSE", "licenses/LICENSE-AGPL-3.0.txt"),
             ("THIRD-PARTY-NOTICES.txt", "licenses/THIRD-PARTY-NOTICES.txt"),
             ("crates/rdtv-app/assets/fonts/LICENSE-DejaVu.txt", "licenses/LICENSE-DejaVu.txt"),
+            ("crates/rdtv-app/assets/fonts/LICENSE-Inter.txt", "licenses/LICENSE-Inter.txt"),
         ]:
             sp = os.path.join(ROOT, src)
             if os.path.exists(sp):

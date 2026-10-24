@@ -12,7 +12,8 @@ Native components
 * libopus 1.5.2 - BSD-3-Clause - https://opus-codec.org (statically linked (audio decoding))
 * OpenSSL (via openssl-src) 3.x (vendored) - Apache-2.0 - https://www.openssl.org (statically linked (TLS used by upstream hbb_common))
 * libsodium (via libsodium-sys) 1.0.x (bundled) - ISC - https://libsodium.org (statically linked (RustDesk key exchange))
-* DejaVu fonts 2.37 - Bitstream-Vera AND LicenseRef-Public-Domain - https://dejavu-fonts.github.io (embedded in the executable)
+* Inter (Regular, SemiBold) 4.1 - OFL-1.1 - https://github.com/rsms/inter (embedded in the executable (interface font))
+* DejaVu fonts 2.37 - Bitstream-Vera AND LicenseRef-Public-Domain - https://dejavu-fonts.github.io (embedded in the executable (symbol fallback))
 
 Rust crates (name version - license - source)
 ---------------------------------------------
