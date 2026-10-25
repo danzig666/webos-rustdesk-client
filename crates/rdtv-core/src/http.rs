@@ -77,7 +77,7 @@ async fn request_inner(
     }
     let body = json_body.unwrap_or("");
     let mut req = format!(
-        "{method} {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: RemoteDeskTV\r\nAccept: application/json\r\nConnection: close\r\n"
+        "{method} {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: RustCouch\r\nAccept: application/json\r\nConnection: close\r\n"
     );
     if let Some(t) = bearer {
         req.push_str(&format!("Authorization: Bearer {t}\r\n"));

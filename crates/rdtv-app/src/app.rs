@@ -957,7 +957,7 @@ impl App {
         match self.screen {
             Screen::Home => {
                 self.modal = Some(Modal::Confirm {
-                    text: "Exit RemoteDesk TV?".into(),
+                    text: "Exit RustCouch?".into(),
                     action: ConfirmAction::Quit,
                 });
             }

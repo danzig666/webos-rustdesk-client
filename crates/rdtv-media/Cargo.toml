@@ -1,6 +1,6 @@
 [package]
 name = "rdtv-media"
-description = "Video/audio decoding for RemoteDesk TV: webOS NDL hardware decode, libvpx fallback, Opus"
+description = "Video/audio decoding for RustCouch: webOS NDL hardware decode, libvpx fallback, Opus"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

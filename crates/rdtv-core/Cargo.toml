@@ -1,6 +1,6 @@
 [package]
 name = "rdtv-core"
-description = "RustDesk-compatible outbound session core for RemoteDesk TV (client only)"
+description = "RustDesk-compatible outbound session core for RustCouch (client only)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

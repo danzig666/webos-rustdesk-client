@@ -45,7 +45,7 @@ ares-install --device tv --remove io.github.danzig666.remotedesktv
 ```
 
 Updating means installing the newer `.ipk`. From Windows,
-[tools/Install-RemoteDeskTV.ps1](../tools/Install-RemoteDeskTV.ps1) wraps these commands
+[tools/Install-RustCouch.ps1](../tools/Install-RustCouch.ps1) wraps these commands
 (`-Route DevMode`).
 
 ## Logs

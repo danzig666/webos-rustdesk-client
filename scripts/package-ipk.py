@@ -162,7 +162,7 @@ def main():
         control = (
             f"Package: {app_id}\nVersion: {a.version}\nSection: misc\nPriority: optional\n"
             f"Architecture: arm\nInstalled-Size: {installed}\n"
-            f"Maintainer: RemoteDesk TV contributors <noreply@github.com>\n"
+            f"Maintainer: RustCouch contributors <noreply@github.com>\n"
             f"Description: {appinfo['appDescription']}\n"
             f"webOS-Package-Format-Version: 2\nwebOS-Packager-Version: x.y.x\n"
         )

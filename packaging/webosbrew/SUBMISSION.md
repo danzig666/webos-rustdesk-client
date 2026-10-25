@@ -1,4 +1,4 @@
-# Submitting RemoteDesk TV to the official webosbrew catalog
+# Submitting RustCouch to the official webosbrew catalog
 
 `io.github.danzig666.remotedesktv.yml` is the package file for
 [webosbrew/apps-repo](https://github.com/webosbrew/apps-repo) (repo.webosbrew.org, the Homebrew
@@ -21,9 +21,9 @@ are rejected). Be accurate about how the app was made and tested; the maintainer
 ## Pull request text (draft)
 
 ```markdown
-Add RemoteDesk TV (io.github.danzig666.remotedesktv)
+Add RustCouch (io.github.danzig666.remotedesktv)
 
-RemoteDesk TV is an open-source (AGPL-3.0) RustDesk-compatible remote desktop client for webOS 5+.
+RustCouch is an open-source (AGPL-3.0) RustDesk-compatible remote desktop client for webOS 5+.
 It connects out to a computer running the stock RustDesk app (public server, self-hosted server
 or direct IP) and is controlled with the Magic Remote, the remote's buttons, an on-screen keyboard
 or a USB/Bluetooth keyboard. No root required; no inbound listener.

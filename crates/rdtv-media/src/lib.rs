@@ -1,4 +1,4 @@
-//! Media for RemoteDesk TV: webOS NDL hardware video decoding, libvpx software fallback,
+//! Media for RustCouch: webOS NDL hardware video decoding, libvpx software fallback,
 //! Opus audio decoding and the bounded queues between network, decoder and presentation.
 
 pub mod audio;

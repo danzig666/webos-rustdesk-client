@@ -25,7 +25,7 @@ def main():
         "id": "io.github.danzig666.remotedesktv",
         "version": a.version,
         "type": "native",
-        "title": "RemoteDesk TV",
+        "title": "RustCouch",
         "appDescription": "RustDesk-compatible remote desktop client (community project)",
         "iconUri": f"{CATALOG}/icon.png",
         "sourceUrl": REPO,

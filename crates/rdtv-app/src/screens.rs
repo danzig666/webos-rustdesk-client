@@ -87,7 +87,7 @@ pub fn draw_screen(app: &mut App, f: &mut Frame) {
 fn first_run(app: &mut App, f: &mut Frame) {
     header(
         f,
-        "Welcome to RemoteDesk TV",
+        "Welcome to RustCouch",
         "A community RustDesk-compatible client for controlling your computer from the TV.",
     );
     let text = "Install the regular RustDesk app on your computer and note its ID and password. \
@@ -134,9 +134,9 @@ struct HomeItem {
 
 fn home(app: &mut App, f: &mut Frame) {
     let profile = app.store.active_profile().clone();
-    f.g.text("RemoteDesk", 80, 44, size::TITLE, true, theme::TEXT);
-    let w = f.g.text_width("RemoteDesk", size::TITLE, true);
-    f.g.text(" TV", 80 + w, 44, size::TITLE, true, theme::ACCENT2);
+    f.g.text("Rust", 80, 44, size::TITLE, true, theme::TEXT);
+    let w = f.g.text_width("Rust", size::TITLE, true);
+    f.g.text("Couch", 80 + w, 44, size::TITLE, true, theme::ACCENT2);
     // Header buttons.
     let srv = format!("Server: {}", profile.name);
     let sw = (f.g.text_width(&srv, size::BODY, true) + 60).min(620);
@@ -504,7 +504,7 @@ fn settings(app: &mut App, f: &mut Frame) {
         ),
         (
             "set-catalog",
-            "Add the RemoteDesk catalog to the Homebrew Channel (for updates)".into(),
+            "Add the RustCouch catalog to the Homebrew Channel (for updates)".into(),
             0,
         ),
         ("set-scale", format!("Interface size: {scale_label}"), 0),
@@ -1048,9 +1048,7 @@ pub fn diagnostics_text(app: &App) -> String {
         "unprivileged (Developer Mode or non-elevated Homebrew install)"
     };
     let mut s = String::new();
-    s.push_str(&format!(
-        "RemoteDesk TV {VERSION}\nUpstream baseline: {UPSTREAM}\n"
-    ));
+    s.push_str(&format!("RustCouch {VERSION}\nUpstream baseline: {UPSTREAM}\n"));
     s.push_str(&format!(
         "webOS release (os_info.json): {}\n",
         app.platform
@@ -1216,9 +1214,9 @@ fn diagnostics(app: &mut App, f: &mut Frame) {
 }
 
 fn about(_app: &mut App, f: &mut Frame) {
-    header(f, "About RemoteDesk TV", &format!("Version {VERSION}"));
+    header(f, "About RustCouch", &format!("Version {VERSION}"));
     let text = format!(
-        "RemoteDesk TV is an independent, community-made RustDesk-compatible remote desktop client for LG webOS TVs. \
+        "RustCouch is an independent, community-made RustDesk-compatible remote desktop client for LG webOS TVs. \
 It is not made, endorsed or supported by RustDesk, Purslane Ltd., LG Electronics or any project it learned from.\n\n\
 License: GNU AGPL-3.0. Source code: https://github.com/danzig666/webos-rustdesk-client\n\
 Protocol implementation reuses {UPSTREAM} (hbb_common and base crates, AGPL-3.0) and code ported from its client.\n\n\

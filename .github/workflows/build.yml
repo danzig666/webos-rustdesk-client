@@ -179,7 +179,7 @@ jobs:
           # the IPK, and the build checks stay in the workflow artifact.
           notes=docs/RELEASE_NOTES.md
           gh release view "$tag" >/dev/null 2>&1 && gh release delete "$tag" --yes --cleanup-tag=false
-          gh release create "$tag" dist/*.ipk dist/*-source.tar.gz --target "$GITHUB_SHA" --title "RemoteDesk TV ${tag}" --notes-file "$notes"
+          gh release create "$tag" dist/*.ipk dist/*-source.tar.gz --target "$GITHUB_SHA" --title "RustCouch ${tag}" --notes-file "$notes"
       - name: Publish the Homebrew Channel catalog (homebrew-repo branch)
         env:
           GH_TOKEN: ${{ github.token }}

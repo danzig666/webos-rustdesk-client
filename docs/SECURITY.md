@@ -15,7 +15,7 @@ Files are written atomically (temporary file, then rename) with mode **0600**.
 | `state.json` | Server profiles, per-profile favourites, recents and per-computer settings; app settings; local client ID and UUID; cached address book (IDs, names, tags only) | none |
 | `secrets.json` | Per profile and per peer: the remembered password hash. Per profile: the API access token. | yes |
 | `logs/remotedesk-tv.log` (+ `.1`) | Operational log | none by design (see below) |
-| `upstream/` and `~/.config/RemoteDeskTV` | Upstream `hbb_common` config (socks proxy lookup, local key) | none |
+| `upstream/` and `~/.config/RustCouch` | Upstream `hbb_common` config (socks proxy lookup, local key) | none |
 
 **Isolation:** every record is keyed by server profile first. The same peer ID under two profiles shares no password, setting, history or address-book entry. A unit test covers this (`store::tests::profile_isolation_and_roundtrip`).
 
@@ -71,7 +71,7 @@ These rules are unchanged from upstream `Client::secure_connection`:
 - The app runs as the normal launcher-started user and needs no root. It never modifies the TV's jail, firmware, picture or audio settings, or other apps.
 - On a rooted TV the app still runs unprivileged when launched normally. The diagnostics screen reports the uid.
 - Update check: once per start the app fetches the catalog manifest from `raw.githubusercontent.com` (HTTPS, certificate verified, no identifiers sent beyond what any HTTPS request carries). Settings → "Check for updates" turns it off. Installing updates is always done by the Homebrew Channel, never by the app itself.
-- "Add the RemoteDesk catalog to the Homebrew Channel" only launches the Homebrew Channel (via `luna-send-pub`, the public bus) with its documented `addRepository` launch parameter; you confirm the repository there.
+- "Add the RustCouch catalog to the Homebrew Channel" only launches the Homebrew Channel (via `luna-send-pub`, the public bus) with its documented `addRepository` launch parameter; you confirm the repository there.
 
 ## Reporting issues
 

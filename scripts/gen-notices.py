@@ -57,10 +57,10 @@ def main():
     crates = sorted((pkgs[i] for i in seen), key=lambda p: (p["name"], p["version"]))
 
     lines = [
-        "RemoteDesk TV - third-party notices",
+        "RustCouch - third-party notices",
         "=" * 36,
         "",
-        "RemoteDesk TV is licensed under the GNU AGPL-3.0 (see LICENSE-AGPL-3.0.txt).",
+        "RustCouch is licensed under the GNU AGPL-3.0 (see LICENSE-AGPL-3.0.txt).",
         "Complete corresponding source: https://github.com/danzig666/webos-rustdesk-client",
         "(including the pinned RustDesk submodule and scripts/build-deps.sh for the C libraries).",
         "",

@@ -4,7 +4,7 @@ This is an engineering review, not legal advice. The final product name has not 
 
 ## Project license
 
-RemoteDesk TV is licensed under **AGPL-3.0-only** (`LICENSE`). The reason is that it links the AGPL-3.0 RustDesk crates `hbb_common` and `base` unmodified, and it ports AGPL-3.0 code from RustDesk's `src/client.rs`, `src/common.rs` and `src/client/io_loop.rs`. That upstream code is pinned as the git submodule `third_party/rustdesk` at `fada664` (tag 1.5.0). Each ported module states its origin.
+RustCouch is licensed under **AGPL-3.0-only** (`LICENSE`). The reason is that it links the AGPL-3.0 RustDesk crates `hbb_common` and `base` unmodified, and it ports AGPL-3.0 code from RustDesk's `src/client.rs`, `src/common.rs` and `src/client/io_loop.rs`. That upstream code is pinned as the git submodule `third_party/rustdesk` at `fada664` (tag 1.5.0). Each ported module states its origin.
 
 ## Components and compatibility
 
@@ -36,7 +36,7 @@ The AGPL and LGPL-style obligations are met as follows:
 
 ## Naming and branding
 
-- **"RemoteDesk TV"** is a neutral working name. It is not trademark-searched or cleared. Clear the name before a stable or catalog release.
+- **"RustCouch"** (since 0.4.2; formerly the working name "RemoteDesk TV") hints at RustDesk compatibility and at the sofa, without using the RustDesk name or anything resembling it ("Desk"). Compatibility is stated descriptively ("RustDesk-compatible", "for RustDesk"). "Rust" is also the name of the programming language (Rust Foundation trademark); this app is written in Rust and does not claim any endorsement. The name has not been searched or cleared formally.
 - **RustDesk name:** the pinned RustDesk repository has no trademark or naming policy file (its `README.md` and docs were searched for "trademark"; only translation guidance in `AGENTS.md` mentions the brand as a token). The product is therefore described factually as a "RustDesk-compatible client", with an explicit statement that it is not made or endorsed by RustDesk / Purslane Ltd.
 - **Logos:** no RustDesk, LG, webOS, Plex or other project logos are used.
 - **Icon:** the owner supplied the icon artwork. `packaging/webos/icon.svg` is a vector recreation of it, and `scripts/render-icons.py` renders the PNG sizes.

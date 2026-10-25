@@ -2,7 +2,7 @@
 //!
 //! Every release publishes a webOS Homebrew Channel repository (`apps.json`, the format of
 //! repo.webosbrew.org) on the `homebrew-repo` branch. Once the catalog is added to the Homebrew
-//! Channel, it lists RemoteDesk TV and offers "Update" when a newer version is out. The channel
+//! Channel, it lists RustCouch and offers "Update" when a newer version is out. The channel
 //! does not notify by itself, so the app checks the catalog's manifest (one small HTTPS request
 //! per start, switchable off) and shows a notice on Home.
 //!

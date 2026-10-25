@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-  Copy RemoteDesk TV's log and diagnostic report from the TV to the current folder.
+  Copy RustCouch's log and diagnostic report from the TV to the current folder.
   The files contain no passwords, tokens or typed text.
 
 .EXAMPLE
-  .\Get-RemoteDeskTVLogs.ps1 -TvHost 192.168.1.50 -Route Rooted
+  .\Get-RustCouchLogs.ps1 -TvHost 192.168.1.50 -Route Rooted
 .EXAMPLE
-  .\Get-RemoteDeskTVLogs.ps1 -TvHost 192.168.1.50 -Route DevMode -KeyFile $env:USERPROFILE\.ssh\tv_webos
+  .\Get-RustCouchLogs.ps1 -TvHost 192.168.1.50 -Route DevMode -KeyFile $env:USERPROFILE\.ssh\tv_webos
 #>
 param(
   [Parameter(Mandatory = $true)][string]$TvHost,

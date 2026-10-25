@@ -1,4 +1,4 @@
-//! RemoteDesk TV session core: an outbound-only RustDesk-compatible client built on the
+//! RustCouch session core: an outbound-only RustDesk-compatible client built on the
 //! upstream `hbb_common` and `base` crates (RustDesk 1.5.0).
 
 pub mod account;

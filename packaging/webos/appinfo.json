@@ -1,10 +1,10 @@
 {
   "id": "io.github.danzig666.remotedesktv",
   "version": "0.0.0",
-  "vendor": "RemoteDesk TV contributors",
+  "vendor": "RustCouch contributors",
   "type": "native",
   "main": "bin/remotedesk-tv",
-  "title": "RemoteDesk TV",
+  "title": "RustCouch",
   "icon": "icon.png",
   "largeIcon": "icon_large.png",
   "iconColor": "#006FFF",

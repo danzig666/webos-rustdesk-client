@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Install (or update) RemoteDesk TV on an LG webOS TV from Windows.
+  Install (or update) RustCouch on an LG webOS TV from Windows.
 
 .DESCRIPTION
   -Route DevMode : uses LG's webOS CLI (ares-install / ares-launch) with a device registered via
@@ -11,9 +11,9 @@
   existing key or prompts.
 
 .EXAMPLE
-  .\Install-RemoteDeskTV.ps1 -Ipk .\io.github.danzig666.remotedesktv_0.1.0_arm.ipk -Route DevMode -Device tv
+  .\Install-RustCouch.ps1 -Ipk .\io.github.danzig666.remotedesktv_0.1.0_arm.ipk -Route DevMode -Device tv
 .EXAMPLE
-  .\Install-RemoteDeskTV.ps1 -Ipk .\io.github.danzig666.remotedesktv_0.1.0_arm.ipk -Route Rooted -TvHost 192.168.1.50
+  .\Install-RustCouch.ps1 -Ipk .\io.github.danzig666.remotedesktv_0.1.0_arm.ipk -Route Rooted -TvHost 192.168.1.50
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Ipk,

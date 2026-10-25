@@ -4,7 +4,7 @@ For TVs rooted with a supported method and running the
 [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel). The app does **not**
 need root to run. Root is only used here to install a package from a file.
 
-## Recommended: the RemoteDesk catalog in the Homebrew Channel
+## Recommended: the RustCouch catalog in the Homebrew Channel
 
 The project publishes its own Homebrew Channel catalog with every release:
 
@@ -13,13 +13,13 @@ https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/
 ```
 
 1. Homebrew Channel → **Settings → Add repository** → enter the URL.
-2. Back in the app list, open **RemoteDesk TV** → **Install**. The Homebrew Channel checks the
+2. Back in the app list, open **RustCouch** → **Install**. The Homebrew Channel checks the
    package's SHA-256 from the catalog before installing.
-3. To update, open the app's page in the Homebrew Channel and choose **Update**. RemoteDesk TV
+3. To update, open the app's page in the Homebrew Channel and choose **Update**. RustCouch
    checks the catalog once per start and shows **Update … available** on Home, which opens the
    Homebrew Channel (Settings → "Check for updates" turns this off).
 
-If you installed from an `.ipk` first, RemoteDesk TV → **Settings → Add the RemoteDesk catalog to
+If you installed from an `.ipk` first, RustCouch → **Settings → Add the RustCouch catalog to
 the Homebrew Channel** opens the Homebrew Channel with the URL already filled in.
 
 ## Other ways: install the `.ipk` file
@@ -42,11 +42,11 @@ ssh root@<TV-IP> 'luna-send -w 20000 -i luna://com.webos.appInstallService/dev/i
 ```
 
 Wait until the reply contains `"state":"installed"`, then press Ctrl+C. The helper script
-[tools/Install-RemoteDeskTV.ps1](../tools/Install-RemoteDeskTV.ps1) does the same from Windows.
+[tools/Install-RustCouch.ps1](../tools/Install-RustCouch.ps1) does the same from Windows.
 
 ## Launch
 
-Open **RemoteDesk TV** from the launcher. Always launch it through the launcher, not from an SSH
+Open **RustCouch** from the launcher. Always launch it through the launcher, not from an SSH
 shell: hardware video only works for apps started by the TV's app manager.
 
 ## Update
@@ -64,7 +64,7 @@ With the catalog: **Update** on the app's page in the Homebrew Channel. Otherwis
 ## Logs and recovery
 
 * Log file: `/media/developer/apps/usr/palm/applications/io.github.danzig666.remotedesktv/data/logs/remotedesk-tv.log`
-  (the previous run is kept as `.log.1`). [tools/Get-RemoteDeskTVLogs.ps1](../tools/Get-RemoteDeskTVLogs.ps1) copies it.
+  (the previous run is kept as `.log.1`). [tools/Get-RustCouchLogs.ps1](../tools/Get-RustCouchLogs.ps1) copies it.
 * Headless check: `ssh root@<TV-IP> /media/developer/apps/usr/palm/applications/io.github.danzig666.remotedesktv/bin/remotedesk-tv --self-test`
 * Settings → Diagnostics → **Save diagnostic report** writes `data/diagnostics.txt` (no passwords, tokens or typed text).
 * If the app will not start, uninstall and reinstall. It never changes TV settings, root

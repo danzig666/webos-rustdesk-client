@@ -1,21 +1,22 @@
-# RemoteDesk TV
+# RustCouch
 
 **A community RustDesk-compatible remote desktop client for LG webOS TVs (webOS 5.x and newer).**
 Control your Windows, Linux or macOS computer, running the normal unmodified RustDesk app, from the
 sofa with the Magic Remote, a regular remote, or a USB/Bluetooth mouse and keyboard.
 
-<img src="packaging/webos/icon_512.png" width="96" alt="RemoteDesk TV icon">
+<img src="packaging/webos/icon_512.png" width="96" alt="RustCouch icon">
 
 > **Status:** tested on an **LG C3** with a Windows RustDesk host: connecting, Magic Remote, remote
 > buttons, hardware video, keyboard shrink and zoom work. Other models, webOS versions and Developer
 > Mode installs still need reports: see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) and
 > [docs/NONROOT_CHECKLIST.md](docs/NONROOT_CHECKLIST.md).
 
-Not affiliated with or endorsed by RustDesk or LG.
+Not affiliated with or endorsed by RustDesk or LG. Formerly called "RemoteDesk TV" (same app,
+same app ID: updates and saved settings carry over).
 
 ## Install and update with the Homebrew Channel
 
-RemoteDesk TV has its own [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel)
+RustCouch has its own [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel)
 catalog, updated automatically with every release. Other installers that read Homebrew Channel
 repositories, such as [Glasshouse](https://github.com/rorygallagher2024/glasshouse), can use it too:
 
@@ -24,11 +25,11 @@ https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/
 ```
 
 1. In the Homebrew Channel: **Settings → Add repository**, enter the URL above.
-2. **RemoteDesk TV** appears in the app list: open it and choose **Install**.
-3. Updates: when a new version is out, RemoteDesk TV shows **Update … available** on its Home
+2. **RustCouch** appears in the app list: open it and choose **Install**.
+3. Updates: when a new version is out, RustCouch shows **Update … available** on its Home
    screen; it opens the Homebrew Channel, where the app's page offers **Update**.
 
-Already installed from an `.ipk`? **Settings → Add the RemoteDesk catalog to the Homebrew Channel**
+Already installed from an `.ipk`? **Settings → Add the RustCouch catalog to the Homebrew Channel**
 opens the Homebrew Channel with the URL filled in. Other ways to install (Dev Manager, SSH,
 Developer Mode with `ares-install`) are in [Install](#install) below.
 
@@ -84,7 +85,7 @@ Download the `.ipk` from [Releases](https://github.com/danzig666/webos-rustdesk-
 
 * Rooted TV / Homebrew Channel: [docs/INSTALL_ROOTED.md](docs/INSTALL_ROOTED.md)
 * Developer Mode (non-rooted): [docs/INSTALL_DEVMODE.md](docs/INSTALL_DEVMODE.md)
-* Windows helpers: [tools/](tools/) (`Install-RemoteDeskTV.ps1`, `Get-RemoteDeskTVLogs.ps1`, `Test-RemoteDeskTV.ps1`)
+* Windows helpers: [tools/](tools/) (`Install-RustCouch.ps1`, `Get-RustCouchLogs.ps1`, `Test-RustCouch.ps1`)
 
 Then read the [user guide](docs/USER_GUIDE.md).
 

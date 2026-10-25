@@ -1,6 +1,6 @@
-# RemoteDesk TV user guide
+# RustCouch user guide
 
-RemoteDesk TV connects your LG TV to a computer running the normal **RustDesk** app (Windows,
+RustCouch connects your LG TV to a computer running the normal **RustDesk** app (Windows,
 Linux or macOS). You control the computer from the sofa. Nothing on the TV can be controlled from
 the computer.
 

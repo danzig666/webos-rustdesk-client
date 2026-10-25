@@ -102,9 +102,9 @@ pub fn set_sdl_hints() {
 /// Hostname-like label sent to hosts as `my_name`.
 pub fn client_name() -> String {
     if crate::keys::is_webos() {
-        "LG TV (RemoteDesk TV)".to_owned()
+        "LG TV (RustCouch)".to_owned()
     } else {
-        "RemoteDesk TV (desktop)".to_owned()
+        "RustCouch (desktop)".to_owned()
     }
 }
 

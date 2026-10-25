@@ -1,4 +1,4 @@
-//! RemoteDesk TV: RustDesk-compatible remote desktop client for LG webOS TVs.
+//! RustCouch: RustDesk-compatible remote desktop client for LG webOS TVs.
 
 mod app;
 mod audio_out;
@@ -33,7 +33,7 @@ fn run() -> anyhow::Result<()> {
     let data = platform::data_dir();
     let log_path = platform::init_logging(&data);
     log::info!(
-        "RemoteDesk TV {} starting (args: {} launch params)",
+        "RustCouch {} starting (args: {} launch params)",
         updates::current_version(),
         std::env::args().count().saturating_sub(1)
     );
@@ -53,7 +53,7 @@ fn run() -> anyhow::Result<()> {
         Ok(m) if m.w > 0 && m.h > 0 => (m.w as u32, m.h as u32),
         _ => (1920, 1080),
     };
-    let mut wb = video.window("RemoteDesk TV", w, h);
+    let mut wb = video.window("RustCouch", w, h);
     if keys::is_webos() || std::env::var("RDTV_FULLSCREEN").is_ok() {
         wb.fullscreen();
     }

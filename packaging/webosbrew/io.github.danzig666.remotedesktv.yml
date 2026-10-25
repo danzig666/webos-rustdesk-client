@@ -1,4 +1,4 @@
-title: RemoteDesk TV
+title: RustCouch
 iconUri: https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/icon.png
 # Rewritten by every release (the project's own catalog branch), so the channel picks up
 # updates without this file changing.
@@ -9,7 +9,7 @@ shortDescription: RustDesk-compatible remote desktop client for your computer
 requirements:
   webosRelease: '>=5'
 description: |
-  Control your Windows, Linux or macOS computer from the sofa. RemoteDesk TV connects **out**
+  Control your Windows, Linux or macOS computer from the sofa. RustCouch connects **out**
   to a computer running the normal, unmodified [RustDesk](https://rustdesk.com) app (protocol
   baseline 1.5.0), through the public RustDesk server, a self-hosted server, or direct IP.
   Nothing on the TV can be controlled remotely.

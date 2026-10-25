@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Run RemoteDesk TV's headless self test on a rooted TV over SSH (decoders, crypto, storage,
+  Run RustCouch's headless self test on a rooted TV over SSH (decoders, crypto, storage,
   NDL hardware decoder probe, advertised codecs).
 #>
 param([Parameter(Mandatory = $true)][string]$TvHost)

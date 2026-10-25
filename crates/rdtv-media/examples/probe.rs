@@ -89,7 +89,7 @@ fn main() {
         caps: dcaps,
         audio_enabled: true,
         client_id: "123123123".into(),
-        client_name: "RemoteDesk TV probe".into(),
+        client_name: "RustCouch probe".into(),
         force_relay: false,
     };
     let h = session::start(
