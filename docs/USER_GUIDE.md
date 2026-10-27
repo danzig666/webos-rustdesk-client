@@ -35,8 +35,12 @@ computers it talks to. Without it, connections still work but are not verified e
   BIOS/UEFI and network adapter settings and be connected by cable on most PCs.
 * **Server:** button: switch server profile. Each profile has its own favourites, history, saved
   passwords and account. The same ID on two servers shares nothing.
-* **Account & address book**: sign in when your server provides accounts (RustDesk Pro or a
-  compatible API server). ID and password always work without signing in.
+* **Account & address book**: the **public RustDesk server now requires a (free) sign-in** before
+  connecting. Choose **Sign in with Google / GitHub / Microsoft**: a QR code appears; scan it with
+  your phone, sign in there, and the TV continues by itself (the sign-in is remembered). If a
+  connection is refused with "please log in", the error dialog has a **Sign in** button.
+  Self-hosted servers offer accounts with RustDesk Pro or a compatible API server; plain
+  open-source servers need no sign-in.
 
 ## Password
 

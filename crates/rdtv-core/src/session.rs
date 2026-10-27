@@ -95,6 +95,8 @@ pub struct SessionRequest {
     pub client_id: String,
     pub client_name: String,
     pub force_relay: bool,
+    /// Account access token for this profile ("" when signed out), sent to the ID server.
+    pub access_token: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -436,7 +438,7 @@ async fn run(
     }));
     // Establishment can be cancelled by a Disconnect command.
     let established = {
-        let fut = transport::establish(&req.profile, &req.target, req.force_relay);
+        let fut = transport::establish(&req.profile, &req.target, req.force_relay, &req.access_token);
         tokio::pin!(fut);
         loop {
             tokio::select! {
@@ -790,6 +792,7 @@ mod tests {
             client_id: "111222333".into(),
             client_name: "LG TV".into(),
             force_relay: false,
+            access_token: String::new(),
         }
     }
 

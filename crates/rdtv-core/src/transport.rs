@@ -319,10 +319,14 @@ async fn request_relay(
 }
 
 /// Establish a secured stream to `target` using `profile`.
+/// `token` is the profile's account access token (empty when signed out). Like upstream
+/// (`LocalConfig::get_option("access_token")` passed to `PunchHoleRequest.token`), it goes to the
+/// ID server with each punch request; the public server refuses unauthenticated clients.
 pub async fn establish(
     profile: &ServerProfile,
     target: &Target,
     force_relay: bool,
+    token: &str,
 ) -> ResultType<Established> {
     let key = profile.effective_key();
     match target {
@@ -346,7 +350,7 @@ pub async fn establish(
                 peer_pk,
             })
         }
-        Target::Id(peer) => establish_by_id(profile, peer, &key, force_relay).await,
+        Target::Id(peer) => establish_by_id(profile, peer, &key, force_relay, token).await,
     }
 }
 
@@ -355,6 +359,7 @@ async fn establish_by_id(
     peer: &str,
     key: &str,
     force_relay: bool,
+    token: &str,
 ) -> ResultType<Established> {
     let servers = profile.rendezvous_servers();
     if servers.is_empty() {
@@ -390,6 +395,7 @@ async fn establish_by_id(
         conn_type: ConnType::DEFAULT_CONN.into(),
         version: PROTOCOL_VERSION.to_owned(),
         force_relay,
+        token: token.to_owned(),
         ..Default::default()
     });
     let mut signed_id_pk = Vec::new();

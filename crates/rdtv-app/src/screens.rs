@@ -43,12 +43,54 @@ pub struct AccountForm {
     pub status: String,
     pub result: Option<std::sync::Arc<std::sync::Mutex<Option<AccountResult>>>>,
     pub home_tab: usize,
+    /// Browser sign-in providers of the active profile's API server, and for which profile.
+    pub providers: Vec<String>,
+    pub providers_for: Option<String>,
+    /// A browser sign-in waiting for the user to finish on their phone.
+    pub oidc: Option<OidcPending>,
+}
+
+#[derive(Clone)]
+pub struct OidcPending {
+    pub provider: String,
+    pub url: String,
+    /// QR code of `url`: modules per side and dark flags, row by row.
+    pub qr: Option<(usize, Vec<bool>)>,
+    pub cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+fn qr_of(url: &str) -> Option<(usize, Vec<bool>)> {
+    let code = qrcode::QrCode::with_error_correction_level(url.as_bytes(), qrcode::EcLevel::L).ok()?;
+    let w = code.width();
+    let dark = code
+        .to_colors()
+        .into_iter()
+        .map(|c| c == qrcode::Color::Dark)
+        .collect();
+    Some((w, dark))
+}
+
+fn provider_label(p: &str) -> String {
+    match p {
+        "github" => "GitHub".into(),
+        "google" => "Google".into(),
+        "microsoft" => "Microsoft".into(),
+        other => {
+            let mut c = other.chars();
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum AccountResult {
     Login(Result<LoginOutcome, String>),
     Book(Result<(String, Vec<account::AbPeer>), String>),
+    Providers(String, Result<Vec<String>, String>),
+    /// provider, code, url
+    OidcStarted(Result<(String, String, String), String>),
 }
 
 fn r(x: i32, y: i32, w: i32, h: i32) -> Rect {
@@ -1285,6 +1327,26 @@ where
     });
 }
 
+/// Poll a browser sign-in every 2 s for up to 5 minutes, or until cancelled.
+fn start_oidc_poll(app: &mut App, code: String, cancel: std::sync::Arc<std::sync::atomic::AtomicBool>) {
+    let c = account_client(app);
+    start_account_task(app, async move {
+        use std::sync::atomic::Ordering;
+        let start = std::time::Instant::now();
+        while start.elapsed() < std::time::Duration::from_secs(300) {
+            rdtv_core::hbb_common::tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            if cancel.load(Ordering::SeqCst) {
+                return AccountResult::Login(Err("cancelled".into()));
+            }
+            // Network hiccups while waiting are ignored, like upstream's OidcSession.
+            if let Ok(Some(outcome)) = c.oidc_poll(&code).await {
+                return AccountResult::Login(Ok(outcome));
+            }
+        }
+        AccountResult::Login(Err("the sign-in was not completed within 5 minutes".into()))
+    });
+}
+
 fn refresh_address_book(app: &mut App) {
     let Some(token) = app
         .store
@@ -1319,7 +1381,31 @@ fn poll_account(app: &mut App) {
     app.account_form.busy = false;
     let pid = app.store.state.active_profile.clone();
     match res {
+        AccountResult::Providers(profile, r) => {
+            app.account_form.busy = false;
+            if profile == pid {
+                app.account_form.providers = r.unwrap_or_default();
+            }
+        }
+        AccountResult::OidcStarted(Ok((provider, code, url))) => {
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            app.account_form.oidc = Some(OidcPending {
+                qr: qr_of(&url),
+                provider: provider.clone(),
+                url,
+                cancel: cancel.clone(),
+            });
+            app.account_form.status = format!(
+                "Scan the code with your phone and sign in with {}. This screen continues by itself.",
+                provider_label(&provider)
+            );
+            start_oidc_poll(app, code, cancel);
+        }
+        AccountResult::OidcStarted(Err(e)) => {
+            app.account_form.status = format!("Sign-in could not start: {e}");
+        }
         AccountResult::Login(Ok(LoginOutcome::Token { token, user })) => {
+            app.account_form.oidc = None;
             app.store.set_token(&pid, Some(token));
             app.store.profile_data_mut(&pid).account_name = user;
             app.store.save();
@@ -1338,6 +1424,7 @@ fn poll_account(app: &mut App) {
             };
         }
         AccountResult::Login(Err(e)) => {
+            app.account_form.oidc = None;
             app.account_form.password.clear();
             app.account_form.status = format!("Sign-in failed: {e}");
         }
@@ -1356,7 +1443,11 @@ fn poll_account(app: &mut App) {
                 app.store.set_token(&pid, None);
                 app.store.save();
             }
-            app.account_form.status = format!("Address book unavailable: {e}");
+            app.account_form.status = if e.to_lowercase().contains("not found") || e.contains("404") {
+                "Signed in. This server has no address book, which is fine: connecting works.".into()
+            } else {
+                format!("Address book unavailable: {e}")
+            };
         }
     }
 }
@@ -1407,6 +1498,20 @@ fn account_modal(app: &mut App, f: &mut Frame) {
         1120,
     );
     let signed_in = app.store.token(&p.id).is_some();
+    // Which browser sign-ins (Google, GitHub…) this server offers; asked once per profile.
+    if !signed_in
+        && !api.is_empty()
+        && !app.account_form.busy
+        && app.account_form.providers_for.as_deref() != Some(p.id.as_str())
+    {
+        app.account_form.providers_for = Some(p.id.clone());
+        app.account_form.providers.clear();
+        let c = account_client(app);
+        let pid = p.id.clone();
+        start_account_task(app, async move {
+            AccountResult::Providers(pid, c.login_providers().await.map_err(|e| e.to_string()))
+        });
+    }
     let form = app.account_form.clone();
     let mut y = 270;
     if signed_in {
@@ -1449,6 +1554,91 @@ fn account_modal(app: &mut App, f: &mut Frame) {
             return;
         }
         y += 120;
+    } else if let Some(o) = form.oidc.clone() {
+        // Browser sign-in in progress: QR code of the sign-in page for a phone.
+        let side = 520;
+        if let Some((w, dark)) = &o.qr {
+            let quiet = 4;
+            let m = (side / (*w as i32 + 2 * quiet)).max(1);
+            let size_px = m * (*w as i32 + 2 * quiet);
+            let qx = 400;
+            let qy = y;
+            f.g.fill(r(qx, qy, size_px, size_px), Color::RGB(255, 255, 255));
+            for row in 0..*w {
+                // Runs of dark modules as one rectangle each (far fewer draw calls).
+                let mut col = 0;
+                while col < *w {
+                    if dark[row * w + col] {
+                        let start = col;
+                        while col < *w && dark[row * w + col] {
+                            col += 1;
+                        }
+                        f.g.fill(
+                            r(
+                                qx + (quiet + start as i32) * m,
+                                qy + (quiet + row as i32) * m,
+                                (col - start) as i32 * m,
+                                m,
+                            ),
+                            Color::RGB(0, 0, 0),
+                        );
+                    } else {
+                        col += 1;
+                    }
+                }
+            }
+        }
+        if o.qr.is_none() {
+            f.g.paragraph(&o.url, 400, y, side, size::SMALL, theme::TEXT);
+        }
+        let tx = 400 + side + 50;
+        let tw = 1520 - tx;
+        let mut ty = y;
+        f.g.text_fit(
+            &format!("Sign in with {}", provider_label(&o.provider)),
+            tx,
+            ty,
+            size::LARGE,
+            true,
+            theme::TEXT,
+            tw,
+        );
+        ty += 70;
+        ty += f.g.paragraph(
+            "1. Scan this code with your phone's camera.\n2. Sign in on the page that opens.\n3. This screen continues by itself.",
+            tx,
+            ty,
+            tw,
+            size::BODY,
+            theme::TEXT,
+        );
+        ty += 30;
+        f.g.paragraph(
+            "Waiting for the sign-in… (up to 5 minutes)",
+            tx,
+            ty,
+            tw,
+            size::SMALL,
+            theme::TEXT_DIM,
+        );
+        if f.button(
+            id("acc-oidc-cancel"),
+            r(tx, y + side - 90, 360, 90),
+            "Cancel",
+            false,
+        ) {
+            o.cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+            app.account_form.oidc = None;
+            app.account_form.status.clear();
+        }
+        // Close (below) also cancels.
+        if f.button(id("acc-close"), r(400, 860, 300, 80), "Close", false) {
+            o.cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+            app.account_form.oidc = None;
+            app.account_form.status.clear();
+            app.modal = None;
+        }
+        return;
     } else if let Some((secret, tfa)) = form.challenge.clone() {
         if f.field(
             id("acc-code"),
@@ -1485,9 +1675,46 @@ fn account_modal(app: &mut App, f: &mut Frame) {
         }
         y += 120;
     } else {
+        // Browser sign-in (what the public RustDesk server uses: Google / GitHub / Microsoft).
+        if !form.providers.is_empty() {
+            let n = form.providers.len().min(4) as i32;
+            let bw = (1120 - (n - 1) * 20) / n;
+            for (i, prov) in form.providers.iter().take(4).enumerate() {
+                let label = format!("Sign in with {}", provider_label(prov));
+                if f.button(
+                    idx("acc-oidc", i),
+                    r(400 + i as i32 * (bw + 20), y, bw, 90),
+                    &label,
+                    i == 0,
+                ) && !form.busy
+                {
+                    let c = account_client(app);
+                    let prov = prov.clone();
+                    app.account_form.status = "Starting sign-in…".into();
+                    start_account_task(app, async move {
+                        AccountResult::OidcStarted(
+                            c.oidc_start(&prov)
+                                .await
+                                .map(|(code, url)| (prov, code, url))
+                                .map_err(|e| e.to_string()),
+                        )
+                    });
+                }
+            }
+            y += 110;
+            f.g.text(
+                "or with a user name and password:",
+                400,
+                y,
+                size::SMALL,
+                false,
+                theme::TEXT_DIM,
+            );
+            y += 44;
+        }
         if f.field(
             id("acc-user"),
-            r(400, y, 1120, 110),
+            r(400, y, 1120, 100),
             "User name or email",
             &form.user,
             false,
@@ -1496,10 +1723,10 @@ fn account_modal(app: &mut App, f: &mut Frame) {
         ) {
             app.open_editor(FieldTarget::AccountUser, form.user.clone(), false);
         }
-        y += 130;
+        y += 115;
         if f.field(
             id("acc-pass"),
-            r(400, y, 1120, 110),
+            r(400, y, 1120, 100),
             "Password",
             &form.password,
             true,
@@ -1508,7 +1735,7 @@ fn account_modal(app: &mut App, f: &mut Frame) {
         ) {
             app.open_editor(FieldTarget::AccountPassword, form.password.clone(), true);
         }
-        y += 140;
+        y += 120;
         if f.button(
             id("acc-login"),
             r(400, y, 540, 90),
@@ -1525,7 +1752,7 @@ fn account_modal(app: &mut App, f: &mut Frame) {
         y += 120;
     }
     f.g.paragraph(
-        if form.status.is_empty() { "Accounts and address books need a server that provides them (RustDesk Pro or a compatible API server). The public server's console and plain open-source servers may not. ID and password connections work without signing in." } else { &form.status },
+        if form.status.is_empty() { "The public RustDesk server needs a (free) sign-in before connecting. Self-hosted servers only offer accounts and address books with RustDesk Pro or a compatible API server." } else { &form.status },
         400, y, 1120, size::SMALL, theme::TEXT_DIM,
     );
     if f.button(id("acc-close"), r(400, 860, 300, 80), "Close", false) {
@@ -1735,12 +1962,33 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
             kind,
             retry,
         } => {
-            let panel = r(360, 260, 1200, 520);
+            // The panel grows with the message (servers send long explanations); text that
+            // would not fit at body size is set smaller, so nothing runs under the buttons.
+            let mut px = size::BODY;
+            let mut text_h = f.g.paragraph_height(&text, 1100, px);
+            if text_h > 560 {
+                px = size::SMALL;
+                text_h = f.g.paragraph_height(&text, 1100, px);
+            }
+            let text_h = text_h.min(H - 300);
+            let panel_h = 120 + text_h + 40 + 90 + 40;
+            let top = ((H - panel_h) / 2).max(20);
+            let panel = r(360, top, 1200, panel_h);
             f.g.round(panel, 28, theme::PANEL);
-            f.g.text_fit(&title, 410, 300, size::TITLE, true, theme::TEXT, 1100);
-            f.g.paragraph(&text, 410, 380, 1100, size::BODY, theme::TEXT_DIM);
+            f.g.text_fit(&title, 410, top + 40, size::TITLE, true, theme::TEXT, 1100);
+            f.g.paragraph(&text, 410, top + 120, 1100, px, theme::TEXT_DIM);
+            let by = top + 120 + text_h + 40;
+            // The public RustDesk server refuses clients that are not signed in.
+            let wants_login = kind == FailureKind::LoginRequired;
             let mut x = 410;
-            if retry && f.button(id("fail-retry"), r(x, 650, 360, 90), "Retry", true) {
+            if wants_login && f.button(id("fail-login"), r(x, by, 360, 90), "Sign in", true) {
+                app.modal = Some(Modal::Account);
+                return;
+            }
+            if wants_login {
+                x += 380;
+            }
+            if retry && f.button(id("fail-retry"), r(x, by, 360, 90), "Retry", !wants_login) {
                 if let Some((_, t)) = app.last_session.clone() {
                     app.modal = None;
                     app.connect(t, None);
@@ -1751,12 +1999,12 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
                 x += 380;
             }
             if kind == FailureKind::Key
-                && f.button(id("fail-profile"), r(x, 650, 400, 90), "Server settings", false)
+                && f.button(id("fail-profile"), r(x, by, 400, 90), "Server settings", false)
             {
                 app.go(Screen::Profiles);
                 keep = false;
             }
-            if f.button(id("fail-close"), r(1180, 650, 330, 90), "Close", false) {
+            if f.button(id("fail-close"), r(1180, by, 330, 90), "Close", false) {
                 keep = false;
             }
             Modal::Failed {

@@ -328,10 +328,9 @@ impl Gfx {
         (px * self.ui_scale * 1.25) as i32
     }
 
-    /// Word-wrapped paragraph; returns the height used.
-    pub fn paragraph(&mut self, s: &str, x: i32, y: i32, max_w: i32, px: f32, c: Color) -> i32 {
-        let lh = self.line_height(px);
-        let mut cy = y;
+    /// Lines of `s` word-wrapped to `max_w` (explicit newlines kept).
+    pub fn wrap(&mut self, s: &str, max_w: i32, px: f32) -> Vec<String> {
+        let mut out = Vec::new();
         for para in s.split('\n') {
             let mut line = String::new();
             for word in para.split(' ') {
@@ -341,13 +340,26 @@ impl Gfx {
                     format!("{line} {word}")
                 };
                 if self.text_width(&cand, px, false) > max_w && !line.is_empty() {
-                    self.text(&line, x, cy, px, false, c);
-                    cy += lh;
-                    line = word.to_owned();
+                    out.push(std::mem::replace(&mut line, word.to_owned()));
                 } else {
                     line = cand;
                 }
             }
+            out.push(line);
+        }
+        out
+    }
+
+    /// Height `paragraph` would use, without drawing.
+    pub fn paragraph_height(&mut self, s: &str, max_w: i32, px: f32) -> i32 {
+        self.wrap(s, max_w, px).len() as i32 * self.line_height(px)
+    }
+
+    /// Word-wrapped paragraph; returns the height used.
+    pub fn paragraph(&mut self, s: &str, x: i32, y: i32, max_w: i32, px: f32, c: Color) -> i32 {
+        let lh = self.line_height(px);
+        let mut cy = y;
+        for line in self.wrap(s, max_w, px) {
             self.text(&line, x, cy, px, false, c);
             cy += lh;
         }

@@ -91,6 +91,7 @@ fn main() {
         client_id: "123123123".into(),
         client_name: "RustCouch probe".into(),
         force_relay: false,
+        access_token: String::new(),
     };
     let h = session::start(
         rt.handle(),

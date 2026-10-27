@@ -24,6 +24,8 @@ pub enum FailureKind {
     Auth,
     /// Host refused the session or a permission.
     Refused,
+    /// The ID server wants this client signed in first (the public RustDesk server does).
+    LoginRequired,
     /// Could not decode or present the negotiated video.
     Codec,
     /// TV platform failure (decoder load, audio device, ...).
@@ -51,6 +53,7 @@ impl FailureKind {
             FailureKind::Key => "Server key problem",
             FailureKind::Auth => "Sign-in failed",
             FailureKind::Refused => "Connection refused by the computer",
+            FailureKind::LoginRequired => "Sign-in required by the server",
             FailureKind::Codec => "Video could not be decoded",
             FailureKind::Platform => "TV playback problem",
             FailureKind::ConnectionLost => "Connection lost",
@@ -71,6 +74,8 @@ pub fn classify(err: &str) -> FailureKind {
         FailureKind::Key
     } else if e.contains("password") || e.contains("2fa") || e.contains("verification code") {
         FailureKind::Auth
+    } else if e.contains("log in") || e.contains("login required") || e.contains("login-required") {
+        FailureKind::LoginRequired
     } else if e.contains("refused")
         || e.contains("not allowed")
         || e.contains("denied")
@@ -141,6 +146,14 @@ impl ReconnectPlan {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn public_server_login_message_is_login_required() {
+        // Start of the public server's other_failure text (2026-10).
+        let msg = "The connection is not allowed.\n\nDue to ongoing scamming and botnet abuse, this public server currently requires users to log in before connecting.";
+        assert_eq!(classify(msg), FailureKind::LoginRequired);
+        assert!(!FailureKind::LoginRequired.retryable());
+    }
 
     #[test]
     fn classification() {

@@ -135,6 +135,59 @@ impl Client {
     }
 
     /// Returns the user name, or an error (401/400 means the token is no longer valid).
+    /// Third-party sign-in providers offered by the server (`GET /api/login-options`:
+    /// `"oidc/<name>"` and `"common-oidc/<json list of {name}>"` entries, as the RustDesk
+    /// desktop client parses them in `flutter/lib/models/user_model.dart`).
+    pub async fn login_providers(&self) -> ResultType<Vec<String>> {
+        let r = http::request("GET", &self.url("/api/login-options")?, None, None).await?;
+        if r.status != 200 {
+            bail!("The server lists no sign-in options (HTTP {})", r.status);
+        }
+        Ok(parse_login_providers(&r.body))
+    }
+
+    /// Start a browser sign-in with provider `op` (upstream `OidcSession::auth`):
+    /// returns the code to poll with and the URL the user opens (on a phone).
+    pub async fn oidc_start(&self, op: &str) -> ResultType<(String, String)> {
+        let body = json!({
+            "op": op, "id": self.my_id, "uuid": self.uuid,
+            "deviceInfo": self.device_info(), "apiDomain": self.api.trim_end_matches('/'),
+        });
+        let r = http::request(
+            "POST",
+            &self.url("/api/oidc/auth")?,
+            None,
+            Some(&body.to_string()),
+        )
+        .await?;
+        let v: Value = serde_json::from_str(&r.body).unwrap_or(Value::Null);
+        if let Some(e) = err_of(&v) {
+            bail!("{e}");
+        }
+        let code = v.get("code").and_then(|c| c.as_str()).unwrap_or("");
+        let url = v.get("url").and_then(|c| c.as_str()).unwrap_or("");
+        if code.is_empty() || !(url.starts_with("https://") || url.starts_with("http://")) {
+            bail!("Unexpected sign-in reply (HTTP {})", r.status);
+        }
+        Ok((code.to_owned(), url.to_owned()))
+    }
+
+    /// One poll of a browser sign-in (upstream `OidcSession::query`). `Ok(None)` while the
+    /// user has not finished yet.
+    pub async fn oidc_poll(&self, code: &str) -> ResultType<Option<LoginOutcome>> {
+        let mut u = url::Url::parse(&self.url("/api/oidc/auth-query")?)?;
+        u.query_pairs_mut()
+            .append_pair("code", code)
+            .append_pair("id", &self.my_id)
+            .append_pair("uuid", &self.uuid);
+        let r = http::request("GET", u.as_str(), None, None).await?;
+        let v: Value = serde_json::from_str(&r.body).unwrap_or(Value::Null);
+        if err_of(&v).is_some_and(|e| e.contains("No authed oidc is found")) {
+            return Ok(None);
+        }
+        self.parse_login(r.status, &r.body).map(Some)
+    }
+
     pub async fn current_user(&self, token: &str) -> ResultType<String> {
         let body = json!({ "id": self.my_id, "uuid": self.uuid });
         let r = http::request(
@@ -255,6 +308,30 @@ fn peer_from(v: &Value) -> Option<AbPeer> {
 
 /// Legacy `data` payload: `{"tags":[...],"peers":[{id,alias,hostname,platform,tags,hash}]}`.
 /// Password hashes stored in the address book are deliberately not used here.
+pub fn parse_login_providers(body: &str) -> Vec<String> {
+    let items: Vec<String> = serde_json::from_str(body).unwrap_or_default();
+    let mut out: Vec<String> = Vec::new();
+    for it in &items {
+        if let Some(list) = it.strip_prefix("common-oidc/") {
+            let v: Vec<Value> = serde_json::from_str(list).unwrap_or_default();
+            for p in v {
+                if let Some(n) = p.get("name").and_then(|n| n.as_str()) {
+                    out.push(n.to_owned());
+                }
+            }
+        }
+    }
+    if out.is_empty() {
+        out = items
+            .iter()
+            .filter_map(|i| i.strip_prefix("oidc/").map(str::to_owned))
+            .collect();
+    }
+    out.retain(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c)));
+    out.dedup();
+    out
+}
+
 pub fn parse_legacy_ab(data: &str) -> Vec<AbPeer> {
     let v: Value = serde_json::from_str(data).unwrap_or(Value::Null);
     v.get("peers")
@@ -300,6 +377,15 @@ mod tests {
         );
         assert_eq!(peers.len(), 1);
         assert_eq!(peers[0].alias, "Office");
+    }
+
+    #[test]
+    fn public_server_login_providers() {
+        // Reply of https://admin.rustdesk.com/api/login-options (2026-10-27), icon trimmed.
+        let body = r#"["oidc/google","oidc/microsoft","oidc/github","common-oidc/[{\"name\":\"google\"},{\"name\":\"github\"},{\"name\":\"microsoft\",\"icon\":\"<svg/>\"}]"]"#;
+        assert_eq!(parse_login_providers(body), vec!["google", "github", "microsoft"]);
+        assert_eq!(parse_login_providers(r#"["oidc/okta"]"#), vec!["okta"]);
+        assert!(parse_login_providers("not json").is_empty());
     }
 
     #[test]

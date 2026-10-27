@@ -450,6 +450,7 @@ impl App {
             client_id: self.store.state.client_id.clone(),
             client_name: crate::platform::client_name(),
             force_relay: false,
+            access_token: self.store.token(&profile.id).unwrap_or_default().to_owned(),
         };
         let ring = Arc::new(rdtv_media::audio::AudioRing::new(250));
         ring.set_muted(rec.settings.muted);
@@ -1117,6 +1118,9 @@ pub fn friendly_error(msg: &str, kind: FailureKind) -> String {
         FailureKind::Codec => format!("The video stream could not be decoded: {msg}."),
         FailureKind::Platform => format!("A TV playback component failed: {msg}."),
         FailureKind::Refused => format!("The remote computer refused: {msg}."),
+        FailureKind::LoginRequired => format!(
+            "The RustDesk server says:\n\n{msg}\n\nChoose Sign in to log in on your phone with Google, GitHub or Microsoft (free), then try again."
+        ),
         FailureKind::Other => msg.to_owned(),
     }
 }
