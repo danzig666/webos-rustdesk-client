@@ -135,6 +135,10 @@ pub struct App {
     pub start: Instant,
     pub log_path: std::path::PathBuf,
     pub focus_lost_at: Option<Instant>,
+    /// Last remote/keyboard/pointer input, for the screen saver policy.
+    last_input: Instant,
+    /// What SDL was last told (None = not yet: SDL's own default blocks the screen saver).
+    screensaver_blocked: Option<bool>,
     pub audio_out: Option<AudioOut>,
     pub audio_error: Option<String>,
     pub sdl: sdl2::Sdl,
@@ -154,6 +158,9 @@ pub struct App {
 /// Leaving the app: stop input at once; disconnect when focus has not come back after this
 /// grace period (a transient system overlay does not count as leaving).
 const BACKGROUND_GRACE: Duration = Duration::from_millis(2500);
+
+/// No input for this long in a session lets the TV's screen saver start again.
+const SCREENSAVER_IDLE: std::time::Duration = std::time::Duration::from_secs(10 * 60);
 
 /// LAN discovery state for the Home "Nearby" tab.
 #[derive(Default)]
@@ -215,6 +222,8 @@ impl App {
             start: Instant::now(),
             log_path,
             focus_lost_at: None,
+            last_input: Instant::now(),
+            screensaver_blocked: None,
             audio_out: None,
             audio_error: None,
             sdl,
@@ -245,6 +254,32 @@ impl App {
             }
             self.prev_screen = std::mem::replace(&mut self.screen, s);
             self.ui.reset = true;
+        }
+    }
+
+    /// Hold off the TV's screen saver only while it is useful: a connected session in the
+    /// foreground with input in the last 10 minutes. SDL-webOS answers the TV power service's
+    /// screen saver requests (`registerScreenSaverRequest`) from SDL's "screensaver
+    /// suspended" flag, which SDL sets for every window by default, so without this the app
+    /// vetoed the screen saver all the time, even on Home and while left in the background.
+    /// The idle limit keeps the screen saver (OLED protection) for a forgotten static desktop.
+    fn update_screensaver(&mut self) {
+        let block = self.active.as_ref().is_some_and(|a| a.connected)
+            && self.focus_lost_at.is_none()
+            && self.last_input.elapsed() < SCREENSAVER_IDLE;
+        if self.screensaver_blocked != Some(block) {
+            self.screensaver_blocked = Some(block);
+            log::info!(
+                "screen saver {}",
+                if block { "held off (session)" } else { "allowed" }
+            );
+            unsafe {
+                if block {
+                    sdl2::sys::SDL_DisableScreenSaver();
+                } else {
+                    sdl2::sys::SDL_EnableScreenSaver();
+                }
+            }
         }
     }
 
@@ -647,6 +682,10 @@ impl App {
     // ----- frame -------------------------------------------------------------------------
 
     pub fn update(&mut self, inputs: Vec<In>) {
+        if inputs.iter().any(|i| !matches!(i, In::Focus(_))) {
+            self.last_input = Instant::now();
+        }
+        self.update_screensaver();
         self.updates.poll();
         self.poll_lan();
         while let Ok(m) = self.rx.try_recv() {

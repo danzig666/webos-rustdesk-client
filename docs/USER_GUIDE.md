@@ -100,6 +100,10 @@ View, Keys, Mute, Quality, Info, Disconnect.
 
 ## Leaving the app and reconnecting
 
+* **Screen saver:** the TV's screen saver is held off only during a connected session while you
+  use it. After 10 minutes without any button, pointer or keyboard input it may start again (OLED
+  protection), and on Home, in other apps or with RustCouch in the background it works normally.
+
 * Leaving the app (Home button, another app) **disconnects** after a moment. When you come back, a
   **Reconnect** button is shown.
 * Settings → **Keep connected in background** keeps the session; input is paused, audio muted and
