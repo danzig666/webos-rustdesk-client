@@ -200,6 +200,8 @@ pub struct AppSettings {
     pub audio_enabled_default: bool,
     /// Check the project's Homebrew Channel catalog for a newer version once per start.
     pub check_updates: bool,
+    /// Show passwords in clear text while typing them (off: masked with dots).
+    pub show_passwords: bool,
 }
 
 impl Default for AppSettings {
@@ -214,6 +216,7 @@ impl Default for AppSettings {
             hw_picture_placement: true,
             audio_enabled_default: true,
             check_updates: true,
+            show_passwords: false,
         }
     }
 }

@@ -1724,16 +1724,25 @@ fn account_modal(app: &mut App, f: &mut Frame) {
             app.open_editor(FieldTarget::AccountUser, form.user.clone(), false);
         }
         y += 115;
+        let shown = app.store.state.settings.show_passwords;
         if f.field(
             id("acc-pass"),
-            r(400, y, 1120, 100),
+            r(400, y, 860, 100),
             "Password",
             &form.password,
-            true,
+            !shown,
             "",
             false,
         ) {
             app.open_editor(FieldTarget::AccountPassword, form.password.clone(), true);
+        }
+        if f.button(
+            id("acc-pass-show"),
+            r(1280, y, 240, 100),
+            if shown { "Hide" } else { "Show" },
+            false,
+        ) {
+            toggle_show_passwords(app);
         }
         y += 120;
         if f.button(
@@ -1834,24 +1843,23 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
                 if wrong { theme::WARN } else { theme::TEXT_DIM },
                 1000,
             );
+            let shown = app.store.state.settings.show_passwords;
             if f.field(
                 id("pw-field"),
                 r(460, 380, 1000, 110),
                 "Password",
                 &value,
-                true,
+                !shown,
                 "",
                 false,
             ) {
                 app.open_editor(FieldTarget::Password, value.clone(), true);
             }
-            if f.toggle(
-                id("pw-remember"),
-                r(460, 520, 1000, 90),
-                "Remember password?",
-                remember,
-            ) {
+            if f.toggle(id("pw-remember"), r(460, 520, 490, 90), "Remember", remember) {
                 remember = !remember;
+            }
+            if f.toggle(id("pw-show"), r(970, 520, 490, 90), "Show password", shown) {
+                toggle_show_passwords(app);
             }
             let mut submit = false;
             if f.button(id("pw-ok"), r(460, 650, 480, 90), "Connect", true) {
@@ -2158,6 +2166,13 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
     }
 }
 
+/// Flip "show passwords in clear text" (shared by every password field) and remember it.
+fn toggle_show_passwords(app: &mut App) {
+    let st = &mut app.store.state.settings;
+    st.show_passwords = !st.show_passwords;
+    app.store.save();
+}
+
 pub fn draw_editor(app: &mut App, f: &mut Frame) {
     let Some(mut ed) = app.editor.take() else { return };
     f.scrim();
@@ -2179,17 +2194,29 @@ pub fn draw_editor(app: &mut App, f: &mut Frame) {
     };
     let osk_h = ed.osk.height();
     let fy = (H - osk_h - 170).max(40);
+    let shown = app.store.state.settings.show_passwords;
+    let field_w = if ed.secret { W - 660 } else { W - 400 };
     f.set_inert(true);
     f.field(
         id("editor-field"),
-        r(200, fy, W - 400, 120),
+        r(200, fy, field_w, 120),
         label,
         &ed.value,
-        ed.secret,
+        ed.secret && !shown,
         "",
         true,
     );
     f.set_inert(false);
+    if ed.secret
+        && f.button(
+            id("editor-show"),
+            r(W - 440, fy, 240, 120),
+            if shown { "Hide" } else { "Show" },
+            false,
+        )
+    {
+        toggle_show_passwords(app);
+    }
     f.g.text(
         "Done / Enter: confirm · Close or Back: cancel",
         200,
