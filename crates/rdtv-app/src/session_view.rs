@@ -1248,7 +1248,9 @@ impl ActiveSession {
                 self.grab_mods &= !m;
             }
         }
-        self.keyboard_active_until = Some(Instant::now() + KEYBOARD_ACTIVE);
+        // No `keyboard_active_until` here: that rule (remote Back counts as Esc for 10 s
+        // after typing) exists because the TV reports an uncaptured keyboard's Esc as Back.
+        // A captured keyboard sends its own Esc, so Back always stays the remote's Back.
         let usb = keymap::usb_from_evdev(k.code);
         if !k.repeat && k.code != 28 && !(103..=108).contains(&k.code) {
             let name = usb
