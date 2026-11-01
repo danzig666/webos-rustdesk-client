@@ -64,7 +64,7 @@ the screens look the same.
   opens the toolbar from the keyboard; the Magic Remote (Back opens the toolbar) is unaffected.
 * **USB/Bluetooth mice, captured from the TV**: the mouse moves only the computer's cursor, the
   TV's large pointer is hidden while you use it (it returns when you move the Magic Remote), with
-  adjustable speed (Settings → Mouse speed).
+  adjustable speed and Windows-style acceleration (Settings → Mouse speed / Mouse acceleration).
 * Fit / 1:1 / zoom views, keyboard shrink or overlay, monitor picker, quality controls,
   lock-on-disconnect.
 * Leaving the app disconnects by default (one-press Reconnect on return); optional

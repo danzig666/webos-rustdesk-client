@@ -144,6 +144,7 @@ pub struct ActiveSession {
     /// A captured mouse moved last (not the Magic Remote): draw the computer's cursor.
     pub grab_pointer: bool,
     grab_pos: (f32, f32),
+    last_grab_motion: Option<Instant>,
     view_before_osk: Option<ViewState>,
     /// Host position of the last mouse-button press, and when.
     last_click: Option<(Instant, (i32, i32))>,
@@ -329,6 +330,7 @@ impl ActiveSession {
             grab_mods: 0,
             grab_pointer: false,
             grab_pos: (0.0, 0.0),
+            last_grab_motion: None,
             view_before_osk: None,
             last_click: None,
             osk_focus: None,
@@ -1321,10 +1323,24 @@ impl ActiveSession {
 
     /// Relative movement from a captured mouse: moves a pointer over the picture (the TV's
     /// own pointer is hidden meanwhile) and the computer's cursor with it.
-    pub fn grabbed_motion(&mut self, dx: i32, dy: i32, speed: f32) {
+    pub fn grabbed_motion(&mut self, dx: i32, dy: i32, speed: f32, accel: bool) {
         if !self.connected || self.background {
             return;
         }
+        // Pointer acceleration like Windows' "Enhance pointer precision": the computer gets
+        // absolute positions, which it never accelerates, so the curve is applied here.
+        let now = Instant::now();
+        let speed = if accel {
+            let dt_ms = self
+                .last_grab_motion
+                .map_or(40.0, |t| (now - t).as_secs_f32() * 1000.0)
+                .clamp(8.0, 40.0);
+            let counts = ((dx * dx + dy * dy) as f32).sqrt();
+            speed * accel_gain(counts / dt_ms)
+        } else {
+            speed
+        };
+        self.last_grab_motion = Some(now);
         if !self.grab_pointer {
             self.grab_pointer = true;
             self.grab_pos = if self.pointer_ui == (0, 0) {
@@ -1566,6 +1582,21 @@ impl ActiveSession {
 }
 
 /// Draw the session screen and its overlays.
+/// Pointer gain for a mouse moving at `v` counts per millisecond (1 ≈ one inch per second on
+/// a 1000 DPI mouse): half speed for slow, precise moves, normal at moderate speed, up to
+/// double for fast sweeps, linear in between (the shape of Windows' default curve).
+pub fn accel_gain(v: f32) -> f32 {
+    const CURVE: [(f32, f32); 3] = [(0.0, 0.5), (1.0, 1.0), (4.0, 2.0)];
+    let v = v.max(0.0);
+    for w in CURVE.windows(2) {
+        let ((v0, g0), (v1, g1)) = (w[0], w[1]);
+        if v <= v1 {
+            return g0 + (g1 - g0) * (v - v0) / (v1 - v0);
+        }
+    }
+    CURVE[CURVE.len() - 1].1
+}
+
 pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
     let Some(a) = app.active.as_mut() else {
         f.g.clear(theme::BG);
@@ -2238,6 +2269,16 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn acceleration_curve() {
+        assert_eq!(super::accel_gain(0.0), 0.5);
+        assert_eq!(super::accel_gain(1.0), 1.0);
+        assert_eq!(super::accel_gain(2.5), 1.5);
+        assert_eq!(super::accel_gain(4.0), 2.0);
+        assert_eq!(super::accel_gain(50.0), 2.0);
+        assert!(super::accel_gain(0.5) > 0.5 && super::accel_gain(0.5) < 1.0);
+    }
+
     use super::*;
 
     #[test]

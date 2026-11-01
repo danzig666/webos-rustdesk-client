@@ -210,6 +210,8 @@ pub struct AppSettings {
     pub grab_mouse: bool,
     /// Captured mouse: screen pixels per mouse count.
     pub mouse_speed: f32,
+    /// Captured mouse: speed up fast movements (like Windows' "Enhance pointer precision").
+    pub mouse_accel: bool,
 }
 
 impl Default for AppSettings {
@@ -228,6 +230,7 @@ impl Default for AppSettings {
             grab_keyboard: true,
             grab_mouse: true,
             mouse_speed: 2.0,
+            mouse_accel: true,
         }
     }
 }

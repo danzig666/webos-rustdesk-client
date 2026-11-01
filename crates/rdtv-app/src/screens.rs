@@ -561,6 +561,11 @@ fn settings(app: &mut App, f: &mut Frame) {
         ),
         ("set-scale", format!("Interface size: {scale_label}"), 0),
         ("set-mousespeed", format!("Mouse speed: {}×", s.mouse_speed), 0),
+        (
+            "set-mouseaccel",
+            "Mouse acceleration (faster pointer for fast moves)".into(),
+            if s.mouse_accel { 2 } else { 1 },
+        ),
         ("set-clear", "Clear history for this server".into(), 0),
         (
             "set-export",
@@ -605,6 +610,7 @@ fn settings(app: &mut App, f: &mut Frame) {
         "set-motion" => st.reduced_motion = !st.reduced_motion,
         "set-kbgrab" => st.grab_keyboard = !st.grab_keyboard,
         "set-mousegrab" => st.grab_mouse = !st.grab_mouse,
+        "set-mouseaccel" => st.mouse_accel = !st.mouse_accel,
         "set-mousespeed" => {
             const SPEEDS: [f32; 6] = [1.0, 1.5, 2.0, 3.0, 4.0, 6.0];
             let i = SPEEDS.iter().position(|v| (v - st.mouse_speed).abs() < 0.01);
