@@ -1,3 +1,3 @@
 ### Changes
 
-* Mouse acceleration like Windows' "Enhance pointer precision" (Settings → "Mouse acceleration", on by default).
+* Mouse acceleration toned down (slower overall, gentler speed-up on fast moves).

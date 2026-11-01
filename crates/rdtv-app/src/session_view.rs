@@ -1583,10 +1583,11 @@ impl ActiveSession {
 
 /// Draw the session screen and its overlays.
 /// Pointer gain for a mouse moving at `v` counts per millisecond (1 ≈ one inch per second on
-/// a 1000 DPI mouse): half speed for slow, precise moves, normal at moderate speed, up to
-/// double for fast sweeps, linear in between (the shape of Windows' default curve).
+/// a 1000 DPI mouse): half speed for slow, precise moves, normal at a brisk speed, up to
+/// 1.5x for fast sweeps, linear in between (the shape of Windows' default curve, toned down
+/// after testing on a TV: the first, steeper curve felt too fast).
 pub fn accel_gain(v: f32) -> f32 {
-    const CURVE: [(f32, f32); 3] = [(0.0, 0.5), (1.0, 1.0), (4.0, 2.0)];
+    const CURVE: [(f32, f32); 3] = [(0.0, 0.5), (1.5, 1.0), (6.0, 1.5)];
     let v = v.max(0.0);
     for w in CURVE.windows(2) {
         let ((v0, g0), (v1, g1)) = (w[0], w[1]);
@@ -2272,11 +2273,11 @@ mod tests {
     #[test]
     fn acceleration_curve() {
         assert_eq!(super::accel_gain(0.0), 0.5);
-        assert_eq!(super::accel_gain(1.0), 1.0);
-        assert_eq!(super::accel_gain(2.5), 1.5);
-        assert_eq!(super::accel_gain(4.0), 2.0);
-        assert_eq!(super::accel_gain(50.0), 2.0);
-        assert!(super::accel_gain(0.5) > 0.5 && super::accel_gain(0.5) < 1.0);
+        assert_eq!(super::accel_gain(1.5), 1.0);
+        assert_eq!(super::accel_gain(3.75), 1.25);
+        assert_eq!(super::accel_gain(6.0), 1.5);
+        assert_eq!(super::accel_gain(50.0), 1.5);
+        assert!(super::accel_gain(0.75) > 0.5 && super::accel_gain(0.75) < 1.0);
     }
 
     use super::*;
