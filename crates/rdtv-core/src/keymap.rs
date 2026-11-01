@@ -150,6 +150,16 @@ pub fn map_code(usb: i32, host: HostPlatform) -> Option<u32> {
     })
 }
 
+/// USB HID usage (= SDL scancode) of the key with Linux evdev code `evdev`, if known.
+pub fn usb_from_evdev(evdev: u16) -> Option<u16> {
+    TABLE.iter().find(|e| e.1 == evdev).map(|e| e.0)
+}
+
+/// Host code for the key with Linux evdev code `evdev` (a grabbed keyboard), if known.
+pub fn map_evdev(evdev: u16, host: HostPlatform) -> Option<u32> {
+    map_code(usb_from_evdev(evdev)? as i32, host)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,6 +173,16 @@ mod tests {
         assert_eq!(map_code(0x50, HostPlatform::Windows), Some(0xe04b));
         assert_eq!(map_code(0x3a, HostPlatform::Windows), Some(0x3b)); // F1
         assert_eq!(map_code(0x48, HostPlatform::Windows), None); // Pause: no scancode
+    }
+
+    #[test]
+    fn evdev_codes() {
+        assert_eq!(usb_from_evdev(1), Some(0x29)); // Esc
+        assert_eq!(map_evdev(60, HostPlatform::Windows), Some(0x3c)); // F2
+        assert_eq!(map_evdev(87, HostPlatform::Windows), Some(0x57)); // F11
+        assert_eq!(map_evdev(43, HostPlatform::Windows), Some(0x2b)); // backslash
+        assert_eq!(map_evdev(15, HostPlatform::Linux), Some(23)); // Tab
+        assert_eq!(usb_from_evdev(0x2ff), None);
     }
 
     #[test]

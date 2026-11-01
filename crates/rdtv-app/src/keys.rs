@@ -177,6 +177,25 @@ static KEY_LOG: std::sync::Mutex<std::collections::VecDeque<String>> =
     std::sync::Mutex::new(std::collections::VecDeque::new());
 const KEY_LOG_LEN: usize = 16;
 
+/// SDL's name for a scancode ("F2", "Escape"), or "" when it has none.
+pub fn scancode_name(scancode: i32) -> String {
+    if !(0..512).contains(&scancode) {
+        return String::new();
+    }
+    extern "C" {
+        // Declared with a plain int: webOS scancodes are not variants of the bindgen enum.
+        fn SDL_GetScancodeName(scancode: std::ffi::c_int) -> *const std::ffi::c_char;
+    }
+    let p = unsafe { SDL_GetScancodeName(scancode) };
+    if p.is_null() {
+        String::new()
+    } else {
+        unsafe { std::ffi::CStr::from_ptr(p) }
+            .to_string_lossy()
+            .into_owned()
+    }
+}
+
 fn log_key(k: &RawKey) {
     // Arrows (scancodes 79-82) and Enter/OK (40, keypad 88) are left out: they are what
     // reaching the Diagnostics screen takes, and would push the interesting keys out.
@@ -185,22 +204,7 @@ fn log_key(k: &RawKey) {
     }
     // Never `Keycode::name()`: for webOS remote keys SDL builds the name from an xkb keysym
     // outside Unicode, and the crate's UTF-8 unwrap then panics (0.2.0 crashed on Back).
-    let name = if (0..512).contains(&k.scancode) {
-        extern "C" {
-            // Declared with a plain int: webOS scancodes are not variants of the bindgen enum.
-            fn SDL_GetScancodeName(scancode: std::ffi::c_int) -> *const std::ffi::c_char;
-        }
-        let p = unsafe { SDL_GetScancodeName(k.scancode) };
-        if p.is_null() {
-            String::new()
-        } else {
-            unsafe { std::ffi::CStr::from_ptr(p) }
-                .to_string_lossy()
-                .into_owned()
-        }
-    } else {
-        String::new()
-    };
+    let name = scancode_name(k.scancode);
     let name = if name.is_empty() {
         format!("key 0x{:x}", k.sym)
     } else {
@@ -213,6 +217,11 @@ fn log_key(k: &RawKey) {
         k.scancode,
         k.modstate
     );
+    push_log(line);
+}
+
+/// Add a line to the Diagnostics key log.
+pub fn push_log(line: String) {
     if let Ok(mut l) = KEY_LOG.lock() {
         if l.len() >= KEY_LOG_LEN {
             l.pop_front();

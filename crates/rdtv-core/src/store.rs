@@ -202,6 +202,9 @@ pub struct AppSettings {
     pub check_updates: bool,
     /// Show passwords in clear text while typing them (off: masked with dots).
     pub show_passwords: bool,
+    /// During a session, take USB/Bluetooth keyboards away from the TV (evdev grab) so every
+    /// key, F-keys and Esc included, goes to the computer.
+    pub grab_keyboard: bool,
 }
 
 impl Default for AppSettings {
@@ -217,6 +220,7 @@ impl Default for AppSettings {
             audio_enabled_default: true,
             check_updates: true,
             show_passwords: false,
+            grab_keyboard: true,
         }
     }
 }

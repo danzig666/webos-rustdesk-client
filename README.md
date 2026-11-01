@@ -71,13 +71,15 @@ the screens look the same.
 
 ## Known limitations
 
-* **Some function keys never reach the app.** webOS keeps certain keyboard keys for the TV itself
-  before any app sees them: on an LG C3, **F2, F11 and F12** change TV settings (for example
-  volume/mute) instead of reaching the computer. Other F-keys (F1, F6, F8, F9…) are forwarded.
-  Use the on-screen keyboard's **More** page (Blue button) for the missing ones.
-* **Esc on a keyboard arrives as the remote's Back button** (same key code from the TV). During a
-  session it is sent to the computer as Esc while you are typing (for 10 s after the last key);
-  otherwise Back opens the toolbar. Ctrl+Alt+Shift+Space always opens the toolbar.
+* **Function keys and Esc on a keyboard (experimental fix in 0.6.0).** webOS keeps certain
+  keyboard keys for the TV itself: on an LG C3, **F2, F11 and F12** change TV settings, and **Esc**
+  arrives as the remote's Back. Since 0.6.0 RustCouch takes USB/Bluetooth keyboards away from the
+  TV during a session (the evdev grab chiaki-lg uses for controllers), so every key goes to the
+  computer; the Magic Remote is not affected, and **Ctrl+Alt+Shift+Space** opens the toolbar.
+  Settings → "Send all keyboard keys to the computer" switches it off, and Settings →
+  Diagnostics shows "Keyboard capture" status. If the TV refuses the grab, the old behaviour
+  applies: use the on-screen keyboard's **More** page (Blue button) for the missing F-keys, and
+  Esc is sent as Esc for 10 s after you last typed.
 * Tested on one TV model so far (LG C3); reports from other models are welcome.
 
 ## Install

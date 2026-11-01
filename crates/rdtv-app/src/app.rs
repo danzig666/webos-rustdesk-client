@@ -135,6 +135,7 @@ pub struct App {
     pub start: Instant,
     pub log_path: std::path::PathBuf,
     pub focus_lost_at: Option<Instant>,
+    pub kbgrab: crate::evgrab::KeyboardGrab,
     /// Last remote/keyboard/pointer input, for the screen saver policy.
     last_input: Instant,
     /// What SDL was last told (None = not yet: SDL's own default blocks the screen saver).
@@ -222,6 +223,7 @@ impl App {
             start: Instant::now(),
             log_path,
             focus_lost_at: None,
+            kbgrab: Default::default(),
             last_input: Instant::now(),
             screensaver_blocked: None,
             audio_out: None,
@@ -254,6 +256,35 @@ impl App {
             }
             self.prev_screen = std::mem::replace(&mut self.screen, s);
             self.ui.reset = true;
+        }
+    }
+
+    /// Keep USB/Bluetooth keyboards grabbed away from the TV only while their keys are meant
+    /// for the computer: a connected session in the foreground with no local menu, keyboard
+    /// or dialog open. Everywhere else they type into the app through SDL as usual.
+    fn update_keyboard_grab(&mut self) {
+        let want = self.store.state.settings.grab_keyboard
+            && self.screen == Screen::Session
+            && self.modal.is_none()
+            && self.editor.is_none()
+            && self.focus_lost_at.is_none()
+            && self.active.as_ref().is_some_and(|a| {
+                a.connected
+                    && !a.background
+                    && !a.toolbar
+                    && a.menu == crate::session_view::Menu::None
+                    && a.osk.is_none()
+            });
+        let was = self.kbgrab.active();
+        self.kbgrab.set_active(want);
+        let keys = self.kbgrab.poll();
+        if let Some(a) = self.active.as_mut() {
+            for k in keys {
+                a.grabbed_key(k, &self.store);
+            }
+            if was && !self.kbgrab.active() {
+                a.grab_ended();
+            }
         }
     }
 
@@ -725,6 +756,7 @@ impl App {
         if let Some(a) = self.active.as_mut() {
             a.tick();
         }
+        self.update_keyboard_grab();
         if self
             .toast
             .as_ref()

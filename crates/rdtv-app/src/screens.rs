@@ -535,6 +535,11 @@ fn settings(app: &mut App, f: &mut Frame) {
             if s.escape_chord_enabled { 2 } else { 1 },
         ),
         (
+            "set-kbgrab",
+            "Send all keyboard keys to the computer (F-keys, Esc; experimental)".into(),
+            if s.grab_keyboard { 2 } else { 1 },
+        ),
+        (
             "set-motion",
             "Reduced motion".into(),
             if s.reduced_motion { 2 } else { 1 },
@@ -592,6 +597,7 @@ fn settings(app: &mut App, f: &mut Frame) {
         }
         "set-chord" => st.escape_chord_enabled = !st.escape_chord_enabled,
         "set-motion" => st.reduced_motion = !st.reduced_motion,
+        "set-kbgrab" => st.grab_keyboard = !st.grab_keyboard,
         "set-updates" => {
             st.check_updates = !st.check_updates;
             if st.check_updates {
@@ -1116,6 +1122,16 @@ pub fn diagnostics_text(app: &App) -> String {
             "on"
         } else {
             "off"
+        }
+    ));
+    s.push_str(&format!(
+        "Keyboard capture: {}\n",
+        if !app.store.state.settings.grab_keyboard {
+            "off".to_owned()
+        } else if app.kbgrab.status.is_empty() {
+            "not tried yet (starts in a session)".to_owned()
+        } else {
+            app.kbgrab.status.chars().take(300).collect()
         }
     ));
     let keys = crate::keys::recent_keys();

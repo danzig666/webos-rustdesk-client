@@ -139,6 +139,8 @@ pub struct ActiveSession {
     toolbar_activity: Instant,
     pub menu: Menu,
     pub osk: Option<Osk>,
+    /// Modifiers held on a grabbed keyboard (bits: 1 Ctrl, 2 Alt, 4 Shift, 8 Win).
+    grab_mods: u8,
     view_before_osk: Option<ViewState>,
     /// Host position of the last mouse-button press, and when.
     last_click: Option<(Instant, (i32, i32))>,
@@ -164,7 +166,7 @@ pub struct ActiveSession {
     keyboard_active_until: Option<Instant>,
     banner: Option<(String, Instant)>,
     win_alone: bool,
-    background: bool,
+    pub background: bool,
     last_move_sent: (i32, i32),
     fps_count: (Instant, u64, f32),
     pub notice: Option<(String, Instant)>,
@@ -321,6 +323,7 @@ impl ActiveSession {
             toolbar_activity: Instant::now(),
             menu: Menu::None,
             osk: None,
+            grab_mods: 0,
             view_before_osk: None,
             last_click: None,
             osk_focus: None,
@@ -1220,6 +1223,78 @@ impl ActiveSession {
             In::Text(_) => true,
             _ => false,
         }
+    }
+
+    /// A key from a keyboard grabbed away from the TV (see `evgrab`): sent by position in
+    /// map mode, so modifiers, F-keys and Esc all reach the computer as pressed.
+    pub fn grabbed_key(&mut self, k: crate::evgrab::EvKey, store: &Store) {
+        if !self.connected || self.background {
+            return;
+        }
+        const MODS: [(u16, u8); 8] = [
+            (29, 1),
+            (97, 1), // Ctrl
+            (56, 2),
+            (100, 2), // Alt
+            (42, 4),
+            (54, 4), // Shift
+            (125, 8),
+            (126, 8), // Win
+        ];
+        if let Some(&(_, m)) = MODS.iter().find(|(c, _)| *c == k.code) {
+            if k.down {
+                self.grab_mods |= m;
+            } else {
+                self.grab_mods &= !m;
+            }
+        }
+        self.keyboard_active_until = Some(Instant::now() + KEYBOARD_ACTIVE);
+        let usb = keymap::usb_from_evdev(k.code);
+        if k.code != 28 && !(103..=108).contains(&k.code) {
+            let name = usb
+                .map(|u| crate::keys::scancode_name(u as i32))
+                .unwrap_or_default();
+            crate::keys::push_log(format!(
+                "{}{} ev{} (grabbed)",
+                if k.down { "+" } else { "-" },
+                if name.is_empty() { "key".into() } else { name },
+                k.code
+            ));
+        }
+        // Physical escape chord: Ctrl+Alt+Shift+Space opens local controls.
+        if k.down && k.code == 57 && self.grab_mods & 7 == 7 && store.state.settings.escape_chord_enabled {
+            self.toolbar = true;
+            self.menu = Menu::None;
+            self.touch_toolbar();
+            return;
+        }
+        let host = self
+            .peer
+            .as_ref()
+            .and_then(|p| HostPlatform::from_peer(&p.platform));
+        if let Some(code) = host.and_then(|h| keymap::map_evdev(k.code, h)) {
+            self.win_alone = false;
+            self.send_map_key(code, k.down);
+        } else if let Some(sc) = usb.and_then(|u| sdl2::keyboard::Scancode::from_i32(u as i32)) {
+            // Host platform unknown: the legacy path, as for keys arriving through SDL.
+            if let Some(key) = Keycode::from_scancode(sc) {
+                let m = self.grab_mods;
+                let mods = KeyMods {
+                    ctrl: m & 1 != 0,
+                    alt: m & 2 != 0,
+                    shift: m & 4 != 0,
+                    gui: m & 8 != 0,
+                    ..KeyMods::default()
+                };
+                self.physical_key(key, Some(sc), &mods, k.down, false);
+            }
+        }
+    }
+
+    /// Release everything held from a grabbed keyboard (the grab is ending).
+    pub fn grab_ended(&mut self) {
+        self.grab_mods = 0;
+        self.pause_input();
     }
 
     /// Host code of a physical key in map mode, when the host platform is known.

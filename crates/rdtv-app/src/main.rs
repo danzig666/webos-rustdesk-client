@@ -2,6 +2,7 @@
 
 mod app;
 mod audio_out;
+mod evgrab;
 mod gfx;
 mod hwplane;
 mod keys;
