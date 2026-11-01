@@ -1,4 +1,4 @@
 ### Changes
 
-* USB/Bluetooth keyboards are captured during a session, so F2, F11, F12 and Esc reach the computer (experimental; Settings → "Send all keyboard keys to the computer").
-* "Show password" option for password fields.
+* Fix: the Magic Remote's Back button opens the toolbar again with keyboard capture on (the TV's own "IoT keypad" and Bluetooth audio devices are no longer captured).
+* Fix: held keys repeat on a captured keyboard.

@@ -1250,7 +1250,7 @@ impl ActiveSession {
         }
         self.keyboard_active_until = Some(Instant::now() + KEYBOARD_ACTIVE);
         let usb = keymap::usb_from_evdev(k.code);
-        if k.code != 28 && !(103..=108).contains(&k.code) {
+        if !k.repeat && k.code != 28 && !(103..=108).contains(&k.code) {
             let name = usb
                 .map(|u| crate::keys::scancode_name(u as i32))
                 .unwrap_or_default();
@@ -1262,7 +1262,12 @@ impl ActiveSession {
             ));
         }
         // Physical escape chord: Ctrl+Alt+Shift+Space opens local controls.
-        if k.down && k.code == 57 && self.grab_mods & 7 == 7 && store.state.settings.escape_chord_enabled {
+        if k.down
+            && !k.repeat
+            && k.code == 57
+            && self.grab_mods & 7 == 7
+            && store.state.settings.escape_chord_enabled
+        {
             self.toolbar = true;
             self.menu = Menu::None;
             self.touch_toolbar();
@@ -1286,7 +1291,7 @@ impl ActiveSession {
                     gui: m & 8 != 0,
                     ..KeyMods::default()
                 };
-                self.physical_key(key, Some(sc), &mods, k.down, false);
+                self.physical_key(key, Some(sc), &mods, k.down, k.repeat);
             }
         }
     }

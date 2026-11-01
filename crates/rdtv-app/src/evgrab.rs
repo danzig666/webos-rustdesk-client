@@ -40,16 +40,20 @@ const fn eviocgbit(ev: u32, len: u32) -> u32 {
     ioc(IOC_READ, 0x20 + ev, len)
 }
 
-/// One key from a grabbed keyboard: Linux evdev key code, pressed or released.
+/// One key from a grabbed keyboard: Linux evdev key code, pressed, released or held
+/// (`repeat`: the kernel's auto-repeat while held, sent on as further presses).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EvKey {
     pub code: u16,
     pub down: bool,
+    pub repeat: bool,
 }
 
 struct Dev {
     path: String,
     name: String,
+    /// Bus and vendor:product, for Diagnostics.
+    id: String,
     file: File,
 }
 
@@ -74,12 +78,16 @@ fn bit(bits: &[u8], n: usize) -> bool {
 }
 
 /// A full keyboard: letters, space, Enter and Shift (the Magic Remote and IR receivers lack
-/// letter keys), on a USB or Bluetooth bus, and not an LG remote by name.
+/// letter keys), on a USB or Bluetooth bus, and not one of the TV's own input devices by
+/// name. On an LG C3 the remote's Back arrives through "IoT keypad", and the Bluetooth stack
+/// has a "Bluetooth-audio-source" device; both claim a full key set.
 pub fn looks_like_keyboard(name: &str, bus: u16, key_bits: &[u8]) -> bool {
     let lname = name.to_ascii_lowercase();
-    let remote = ["lge", "magic", "remote", "rcu", "mrcu"]
-        .iter()
-        .any(|w| lname.contains(w));
+    let remote = [
+        "lge", "magic", "remote", "rcu", "iot", "lot ", "keypad", "audio", "virtual", "uinput",
+    ]
+    .iter()
+    .any(|w| lname.contains(w));
     let keys = [30usize, 44, 57, 28, 42] // KEY_A, KEY_Z, KEY_SPACE, KEY_ENTER, KEY_LEFTSHIFT
         .iter()
         .all(|&k| bit(key_bits, k));
@@ -87,7 +95,8 @@ pub fn looks_like_keyboard(name: &str, bus: u16, key_bits: &[u8]) -> bool {
 }
 
 /// Decode `input_event`s from raw bytes (`event_size` is the platform struct size): key
-/// presses and releases only; auto-repeat (value 2) is dropped, the computer repeats itself.
+/// presses, releases and auto-repeats only. The computer does not repeat keys it is sent as
+/// held, so repeats are forwarded as the RustDesk desktop client does.
 pub fn decode_events(buf: &[u8], event_size: usize) -> Vec<EvKey> {
     let mut out = Vec::new();
     // struct input_event { struct timeval time; __u16 type; __u16 code; __s32 value; }
@@ -96,10 +105,11 @@ pub fn decode_events(buf: &[u8], event_size: usize) -> Vec<EvKey> {
         let ty = u16::from_ne_bytes([ev[off], ev[off + 1]]);
         let code = u16::from_ne_bytes([ev[off + 2], ev[off + 3]]);
         let value = i32::from_ne_bytes([ev[off + 4], ev[off + 5], ev[off + 6], ev[off + 7]]);
-        if ty == EV_KEY && (value == 0 || value == 1) {
+        if ty == EV_KEY && (0..=2).contains(&value) {
             out.push(EvKey {
                 code,
-                down: value == 1,
+                down: value != 0,
+                repeat: value == 2,
             });
         }
     }
@@ -163,7 +173,11 @@ impl KeyboardGrab {
             }
         }
         self.status = if !self.devs.is_empty() {
-            let names: Vec<&str> = self.devs.iter().map(|d| d.name.as_str()).collect();
+            let names: Vec<String> = self
+                .devs
+                .iter()
+                .map(|d| format!("{} [{}]", d.name, d.id))
+                .collect();
             format!("capturing {}", names.join(", "))
         } else if !errors.is_empty() {
             errors.join("; ")
@@ -242,6 +256,12 @@ fn open_keyboard(path: &str) -> Result<Option<Dev>, String> {
     Ok(Some(Dev {
         path: path.to_owned(),
         name,
+        id: format!(
+            "{} {:04x}:{:04x}",
+            if id[0] == BUS_USB { "usb" } else { "bt" },
+            id[1],
+            id[2]
+        ),
         file,
     }))
 }
@@ -273,6 +293,9 @@ mod tests {
         assert!(looks_like_keyboard("USB Keyboard", BUS_USB, &kb));
         assert!(!looks_like_keyboard("LGE MRCU", BUS_BLUETOOTH, &kb));
         assert!(!looks_like_keyboard("uinput-virtual", 0x06, &kb));
+        assert!(!looks_like_keyboard("IoT keypad", BUS_BLUETOOTH, &kb));
+        assert!(!looks_like_keyboard("Bluetooth-audio-source", BUS_BLUETOOTH, &kb));
+        assert!(looks_like_keyboard("MX Keys Mini Keyboard", BUS_BLUETOOTH, &kb));
         // A remote: arrows, OK, digits, but no letters.
         let remote = bits(&[103, 108, 105, 106, 28, 2, 3, 4]);
         assert!(!looks_like_keyboard("BT remote", BUS_BLUETOOTH, &remote));
@@ -291,11 +314,16 @@ mod tests {
             let mut buf = ev(size, 4, 4, 0x70029); // EV_MSC scan
             buf.extend(ev(size, EV_KEY, 1, 1)); // Esc down
             buf.extend(ev(size, 0, 0, 0)); // SYN
-            buf.extend(ev(size, EV_KEY, 1, 2)); // repeat: dropped
+            buf.extend(ev(size, EV_KEY, 1, 2)); // auto-repeat
             buf.extend(ev(size, EV_KEY, 1, 0)); // Esc up
+            let k = |down, repeat| EvKey {
+                code: 1,
+                down,
+                repeat,
+            };
             assert_eq!(
                 decode_events(&buf, size),
-                vec![EvKey { code: 1, down: true }, EvKey { code: 1, down: false }]
+                vec![k(true, false), k(true, true), k(false, false)]
             );
         }
     }
