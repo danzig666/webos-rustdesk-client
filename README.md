@@ -48,7 +48,8 @@ the screens look the same.
 ## Features
 
 * Connect by RustDesk **ID** (public server or your **self-hosted** server, as separate profiles) or
-  by **direct IP**. Password login, optional "Remember password?", 2FA, remote approval.
+  by **direct IP**. Password login (remembered by default, with a "Show password" option), 2FA,
+  remote approval.
 * **Hardware video decoding** (H.264, H.265, VP9, AV1) through the TV's Starfish media pipeline, so
   the picture can still be shrunk and zoomed; NDL DirectMedia and software VP9/VP8 as fallbacks.
   Remote **audio** with mute.
@@ -65,9 +66,11 @@ the screens look the same.
 * **USB/Bluetooth mice, captured from the TV**: the mouse moves only the computer's cursor, the
   TV's large pointer is hidden while you use it (it returns when you move the Magic Remote), with
   adjustable speed and Windows-style acceleration (Settings → Mouse speed / Mouse acceleration).
-* Fit / 1:1 / zoom views, keyboard shrink or overlay, monitor picker, quality controls up to
-  **very high bitrates** (~40 Mbit/s at 1080p on own servers and direct connections),
-  lock-on-disconnect.
+* **Picture quality** per computer: Low, Balanced, Best, and **Very high** 250% / 500% / 1000%
+  (about 10 / 20 / 40 Mbit/s at 1080p, like the official client's custom quality; on your own
+  server or a direct connection, capped at 100% through the public relay); 30/60 fps.
+* Fit / 1:1 / zoom views with smooth animation, keyboard shrink or overlay that keeps the clicked
+  text field in view, monitor picker, lock-on-disconnect.
 * Leaving the app disconnects by default (one-press Reconnect on return); optional
   keep-connected; 30-second automatic reconnect after unexpected drops.
 * **Nearby**: finds the RustDesk computers on your home network, and **Wake-on-LAN** wakes them.
