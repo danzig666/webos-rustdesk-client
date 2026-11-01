@@ -540,6 +540,11 @@ fn settings(app: &mut App, f: &mut Frame) {
             if s.grab_keyboard { 2 } else { 1 },
         ),
         (
+            "set-mousegrab",
+            "Mouse moves only the computer's cursor (hides the TV pointer; experimental)".into(),
+            if s.grab_mouse { 2 } else { 1 },
+        ),
+        (
             "set-motion",
             "Reduced motion".into(),
             if s.reduced_motion { 2 } else { 1 },
@@ -598,6 +603,7 @@ fn settings(app: &mut App, f: &mut Frame) {
         "set-chord" => st.escape_chord_enabled = !st.escape_chord_enabled,
         "set-motion" => st.reduced_motion = !st.reduced_motion,
         "set-kbgrab" => st.grab_keyboard = !st.grab_keyboard,
+        "set-mousegrab" => st.grab_mouse = !st.grab_mouse,
         "set-updates" => {
             st.check_updates = !st.check_updates;
             if st.check_updates {
@@ -1125,8 +1131,8 @@ pub fn diagnostics_text(app: &App) -> String {
         }
     ));
     s.push_str(&format!(
-        "Keyboard capture: {}\n",
-        if !app.store.state.settings.grab_keyboard {
+        "Keyboard/mouse capture: {}\n",
+        if !app.store.state.settings.grab_keyboard && !app.store.state.settings.grab_mouse {
             "off".to_owned()
         } else if app.kbgrab.status.is_empty() {
             "not tried yet (starts in a session)".to_owned()

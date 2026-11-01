@@ -38,7 +38,7 @@ pub struct HwPlane {
     pub failures: u32,
 }
 
-fn sym(name: &CStr) -> Option<*mut c_void> {
+pub fn sym(name: &CStr) -> Option<*mut c_void> {
     let p = unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) };
     (!p.is_null()).then_some(p)
 }

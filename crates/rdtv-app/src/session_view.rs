@@ -48,6 +48,8 @@ use std::{
 const TOOLBAR_HIDE: Duration = Duration::from_secs(5);
 const TOOLBAR_H: i32 = 104;
 const KEYBOARD_ACTIVE: Duration = Duration::from_secs(10);
+/// Screen pixels per mouse count for a captured mouse (the TV picture is 1920 wide).
+const MOUSE_SPEED: f32 = 1.0;
 /// Holding the Magic Remote wheel/OK this long without moving = right click.
 const LONG_PRESS: Duration = Duration::from_millis(500);
 /// Pointer travel (UI px) that turns a held press into a drag instead of a long press.
@@ -141,6 +143,9 @@ pub struct ActiveSession {
     pub osk: Option<Osk>,
     /// Modifiers held on a grabbed keyboard (bits: 1 Ctrl, 2 Alt, 4 Shift, 8 Win).
     grab_mods: u8,
+    /// A captured mouse moved last (not the Magic Remote): draw the computer's cursor.
+    pub grab_pointer: bool,
+    grab_pos: (f32, f32),
     view_before_osk: Option<ViewState>,
     /// Host position of the last mouse-button press, and when.
     last_click: Option<(Instant, (i32, i32))>,
@@ -324,6 +329,8 @@ impl ActiveSession {
             menu: Menu::None,
             osk: None,
             grab_mods: 0,
+            grab_pointer: false,
+            grab_pos: (0.0, 0.0),
             view_before_osk: None,
             last_click: None,
             osk_focus: None,
@@ -1114,6 +1121,7 @@ impl ActiveSession {
                 true
             }
             In::PointerMove { x, y } => {
+                self.grab_pointer = false;
                 self.pointer_ui = (*x, *y);
                 self.last_pointer = Some(Instant::now());
                 if local_overlay {
@@ -1298,9 +1306,59 @@ impl ActiveSession {
         }
     }
 
+    /// Relative movement from a captured mouse: moves a pointer over the picture (the TV's
+    /// own pointer is hidden meanwhile) and the computer's cursor with it.
+    pub fn grabbed_motion(&mut self, dx: i32, dy: i32) {
+        if !self.connected || self.background {
+            return;
+        }
+        if !self.grab_pointer {
+            self.grab_pointer = true;
+            self.grab_pos = if self.pointer_ui == (0, 0) {
+                (W as f32 / 2.0, H as f32 / 2.0)
+            } else {
+                (self.pointer_ui.0 as f32, self.pointer_ui.1 as f32)
+            };
+        }
+        let v = self.view_rect();
+        let (x0, x1) = (v.x.max(0.0), (v.x + v.w).min(W as f32) - 1.0);
+        let (y0, y1) = (v.y.max(0.0), (v.y + v.h).min(H as f32) - 1.0);
+        let x = (self.grab_pos.0 + dx as f32 * MOUSE_SPEED).clamp(x0, x1.max(x0));
+        let y = (self.grab_pos.1 + dy as f32 * MOUSE_SPEED).clamp(y0, y1.max(y0));
+        self.grab_pos = (x, y);
+        self.pointer_ui = (x as i32, y as i32);
+        self.last_pointer = Some(Instant::now());
+        if let Some((hx, hy)) = self.pointer_host(x as i32, y as i32) {
+            self.move_to(hx, hy);
+        }
+    }
+
+    pub fn grabbed_button(&mut self, b: crate::evgrab::EvButton, down: bool) {
+        if !self.connected || self.background {
+            return;
+        }
+        let b = match b {
+            crate::evgrab::EvButton::Left => MouseButton::Left,
+            crate::evgrab::EvButton::Right => MouseButton::Right,
+            crate::evgrab::EvButton::Middle => MouseButton::Middle,
+        };
+        // Releases only for buttons we pressed (no stray ups after a grab change).
+        if down || self.held.is_button_down(b) {
+            self.last_ptr_button = Some(Instant::now());
+            self.send_button(b, down);
+        }
+    }
+
+    pub fn grabbed_wheel(&mut self, dx: i32, dy: i32) {
+        if self.connected && !self.background {
+            self.send(input::mouse_wheel(dx, dy));
+        }
+    }
+
     /// Release everything held from a grabbed keyboard (the grab is ending).
     pub fn grab_ended(&mut self) {
         self.grab_mods = 0;
+        self.grab_pointer = false;
         self.pause_input();
     }
 
@@ -1572,7 +1630,7 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
     let pointer_recent = a
         .last_pointer
         .is_some_and(|t| t.elapsed() < Duration::from_secs(3));
-    if a.settings.show_remote_cursor {
+    if a.settings.show_remote_cursor || a.grab_pointer {
         // The host does not draw its cursor into the video; draw it where the host says it is.
         let v = a.view_rect();
         if let (Some(m), Some(c)) = (a.monitor(), a.cursors.get(&a.cursor_id)) {
@@ -1586,6 +1644,10 @@ pub fn draw(app: &mut App, f: &mut Frame, overlay: bool) {
                 ((c.h as f32 * scale) as u32).max(1),
             );
             let _ = f.g.canvas.copy(&c.tex, None, dst);
+        } else if let (true, Some(m)) = (a.grab_pointer, a.monitor()) {
+            // No cursor image from the computer yet: a dot, so the mouse is never invisible.
+            let (ux, uy) = view::from_host(v, m, a.vmouse.0, a.vmouse.1);
+            f.g.round(Rect::new(ux as i32 - 8, uy as i32 - 8, 16, 16), 8, theme::ACCENT2);
         }
     } else if a.settings.dpad_mode == DpadMode::Mouse && !pointer_recent && a.osk.is_none() {
         let v = a.view_rect();

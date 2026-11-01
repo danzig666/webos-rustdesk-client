@@ -205,6 +205,9 @@ pub struct AppSettings {
     /// During a session, take USB/Bluetooth keyboards away from the TV (evdev grab) so every
     /// key, F-keys and Esc included, goes to the computer.
     pub grab_keyboard: bool,
+    /// During a session, take USB/Bluetooth mice away from the TV so they move only the
+    /// computer's cursor (the TV pointer stays for the Magic Remote).
+    pub grab_mouse: bool,
 }
 
 impl Default for AppSettings {
@@ -221,6 +224,7 @@ impl Default for AppSettings {
             check_updates: true,
             show_passwords: false,
             grab_keyboard: true,
+            grab_mouse: true,
         }
     }
 }

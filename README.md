@@ -81,6 +81,10 @@ the screens look the same.
   which keyboard is captured. If a TV refuses the grab, the old behaviour applies: the on-screen
   keyboard's **More** page (Blue button) has the missing F-keys, and Esc is sent as Esc for 10 s
   after you last typed.
+* **Mouse capture (experimental, 0.7.0).** USB/Bluetooth mice are taken away from the TV the same
+  way during a session, so they move only the computer's cursor and the large TV pointer is hidden
+  while you use the mouse (it comes back when you move the Magic Remote). Settings → "Mouse moves
+  only the computer's cursor" switches it off.
 * Tested on one TV model so far (LG C3); reports from other models are welcome.
 
 ## Install

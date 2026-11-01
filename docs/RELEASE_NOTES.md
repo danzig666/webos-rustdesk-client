@@ -1,3 +1,3 @@
 ### Changes
 
-* Fix: the Magic Remote's Back button no longer acts as Esc for 10 s after typing on a captured keyboard.
+* USB/Bluetooth mice move only the computer's cursor; the TV's large pointer is hidden while the mouse is used (experimental; Settings → "Mouse moves only the computer's cursor").

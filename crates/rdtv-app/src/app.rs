@@ -135,7 +135,9 @@ pub struct App {
     pub start: Instant,
     pub log_path: std::path::PathBuf,
     pub focus_lost_at: Option<Instant>,
-    pub kbgrab: crate::evgrab::KeyboardGrab,
+    pub kbgrab: crate::evgrab::InputGrab,
+    /// The TV's own pointer is hidden because a captured mouse is in use.
+    tv_cursor_hidden: bool,
     /// Last remote/keyboard/pointer input, for the screen saver policy.
     last_input: Instant,
     /// What SDL was last told (None = not yet: SDL's own default blocks the screen saver).
@@ -224,6 +226,7 @@ impl App {
             log_path,
             focus_lost_at: None,
             kbgrab: Default::default(),
+            tv_cursor_hidden: false,
             last_input: Instant::now(),
             screensaver_blocked: None,
             audio_out: None,
@@ -263,7 +266,9 @@ impl App {
     /// for the computer: a connected session in the foreground with no local menu, keyboard
     /// or dialog open. Everywhere else they type into the app through SDL as usual.
     fn update_keyboard_grab(&mut self) {
-        let want = self.store.state.settings.grab_keyboard
+        let st = &self.store.state.settings;
+        let (kb, mouse) = (st.grab_keyboard, st.grab_mouse);
+        let want = (kb || mouse)
             && self.screen == Screen::Session
             && self.modal.is_none()
             && self.editor.is_none()
@@ -276,15 +281,34 @@ impl App {
                     && a.osk.is_none()
             });
         let was = self.kbgrab.active();
-        self.kbgrab.set_active(want);
-        let keys = self.kbgrab.poll();
+        self.kbgrab.set_active(want && kb, want && mouse);
+        let events = self.kbgrab.poll();
+        if !events.is_empty() {
+            self.last_input = Instant::now();
+        }
         if let Some(a) = self.active.as_mut() {
-            for k in keys {
-                a.grabbed_key(k, &self.store);
+            use crate::evgrab::GrabEvent;
+            for e in events {
+                match e {
+                    GrabEvent::Key(k) => a.grabbed_key(k, &self.store),
+                    GrabEvent::Motion(dx, dy) => {
+                        a.grabbed_motion(dx, dy);
+                        if !self.tv_cursor_hidden {
+                            set_tv_cursor(false);
+                            self.tv_cursor_hidden = true;
+                        }
+                    }
+                    GrabEvent::Button(b, down) => a.grabbed_button(b, down),
+                    GrabEvent::Wheel(dx, dy) => a.grabbed_wheel(dx, dy),
+                }
             }
             if was && !self.kbgrab.active() {
                 a.grab_ended();
             }
+        }
+        if self.tv_cursor_hidden && !self.kbgrab.has_mouse() {
+            set_tv_cursor(true);
+            self.tv_cursor_hidden = false;
         }
     }
 
@@ -767,6 +791,11 @@ impl App {
     }
 
     fn handle_input(&mut self, i: In) {
+        // The Magic Remote moved: give the TV its pointer back.
+        if matches!(i, In::PointerMove { .. }) && self.tv_cursor_hidden {
+            set_tv_cursor(true);
+            self.tv_cursor_hidden = false;
+        }
         match &i {
             In::Quit => {
                 self.end_session(false, "quit");
@@ -1154,5 +1183,21 @@ pub fn friendly_error(msg: &str, kind: FailureKind) -> String {
             "The RustDesk server says:\n\n{msg}\n\nChoose Sign in to log in on your phone with Google, GitHub or Microsoft (free), then try again."
         ),
         FailureKind::Other => msg.to_owned(),
+    }
+}
+
+/// Show or hide the TV's own pointer (`SDL_webOSCursorVisibility`, when SDL-webOS has it).
+fn set_tv_cursor(visible: bool) {
+    type CursorFn = unsafe extern "C" fn(sdl2::sys::SDL_bool) -> sdl2::sys::SDL_bool;
+    if let Some(p) = crate::hwplane::sym(c"SDL_webOSCursorVisibility") {
+        // SAFETY: the symbol has this signature in SDL-webOS's SDL_system.h.
+        let f: CursorFn = unsafe { std::mem::transmute(p) };
+        let v = if visible {
+            sdl2::sys::SDL_bool::SDL_TRUE
+        } else {
+            sdl2::sys::SDL_bool::SDL_FALSE
+        };
+        unsafe { f(v) };
+        log::info!("TV pointer {}", if visible { "shown" } else { "hidden" });
     }
 }
