@@ -65,6 +65,28 @@ pub enum Quality {
     Best,
     /// Upstream "low" (fast).
     Low,
+    /// Upstream "custom" image quality in percent (100 = 2x the base bitrate, a little above
+    /// "best"). Above 100 only on a self-hosted server or a direct connection, like upstream.
+    Custom(u16),
+}
+
+impl Quality {
+    /// The extra levels offered above "best".
+    pub const HIGH: [Quality; 3] = [Quality::Custom(250), Quality::Custom(500), Quality::Custom(1000)];
+
+    /// Menu label.
+    pub fn label(self) -> String {
+        match self {
+            Quality::Balanced => "Balanced".into(),
+            Quality::Best => "Best".into(),
+            Quality::Low => "Low".into(),
+            // Base bitrate at 1080p is ~2.07 Mbit/s; custom ratio = percent * 2 / 100.
+            Quality::Custom(p) => format!(
+                "Very high {p}% (~{} Mbit/s at 1080p)",
+                (p as u32 * 41 + 500) / 1000
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

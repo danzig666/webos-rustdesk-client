@@ -895,17 +895,7 @@ fn peer_settings(app: &mut App, f: &mut Frame, peer: &str) {
             String::new(),
             if rec.favorite { 2 } else { 1 },
         ),
-        (
-            "ps-quality",
-            "Picture quality".into(),
-            match s.quality {
-                Quality::Balanced => "Balanced",
-                Quality::Best => "Best",
-                Quality::Low => "Low",
-            }
-            .into(),
-            0,
-        ),
+        ("ps-quality", "Picture quality".into(), s.quality.label(), 0),
         (
             "ps-fps",
             "Frame rate".into(),
@@ -1032,9 +1022,14 @@ fn peer_settings(app: &mut App, f: &mut Frame, peer: &str) {
         match k {
             "ps-fav" => rec.favorite = !rec.favorite,
             "ps-quality" => {
+                // Very high levels are capped at 100% when connected through the public
+                // server's relay (see the session's quality menu).
                 s.quality = match s.quality {
                     Quality::Balanced => Quality::Best,
-                    Quality::Best => Quality::Low,
+                    Quality::Best => Quality::HIGH[0],
+                    Quality::Custom(p) if p < 500 => Quality::HIGH[1],
+                    Quality::Custom(p) if p < 1000 => Quality::HIGH[2],
+                    Quality::Custom(_) => Quality::Low,
                     Quality::Low => Quality::Balanced,
                 }
             }

@@ -279,12 +279,24 @@ pub fn start(
     SessionHandle { generation, tx }
 }
 
-fn quality_enum(q: Quality) -> ImageQuality {
+/// Image quality option fields `(image_quality, custom_image_quality)` for `q`. On the public
+/// server's relay, custom levels are capped at 100%, as the upstream client does
+/// (`allow_more`), to spare the shared relays.
+fn quality_fields(q: Quality, public_relay: bool) -> (ImageQuality, i32) {
     match q {
-        Quality::Balanced => ImageQuality::Balanced,
-        Quality::Best => ImageQuality::Best,
-        Quality::Low => ImageQuality::Low,
+        Quality::Balanced => (ImageQuality::Balanced, 0),
+        Quality::Best => (ImageQuality::Best, 0),
+        Quality::Low => (ImageQuality::Low, 0),
+        Quality::Custom(p) => {
+            let p = if public_relay { p.min(100) } else { p }.clamp(10, 2000);
+            (ImageQuality::NotSet, (p as i32) << 8)
+        }
     }
+}
+
+/// Connected to the public RustDesk server's relay (custom quality limited to 100%).
+fn public_relay(req: &SessionRequest, route: Route) -> bool {
+    req.profile.kind == crate::profile::ProfileKind::Public && route == Route::Relay
 }
 
 fn bool_opt(b: bool) -> hbb_common::protobuf::EnumOrUnknown<option_message::BoolOption> {
@@ -296,10 +308,12 @@ fn bool_opt(b: bool) -> hbb_common::protobuf::EnumOrUnknown<option_message::Bool
 }
 
 /// Port of upstream `get_option_message` restricted to this product's scope.
-fn option_message(req: &SessionRequest) -> OptionMessage {
+fn option_message(req: &SessionRequest, route: Route) -> OptionMessage {
     let s = &req.settings;
     let mut msg = OptionMessage::new();
-    msg.image_quality = quality_enum(s.quality).into();
+    let (q, custom) = quality_fields(s.quality, public_relay(req, route));
+    msg.image_quality = q.into();
+    msg.custom_image_quality = custom;
     if s.fps > 0 {
         msg.custom_fps = s.fps as i32;
     }
@@ -319,14 +333,14 @@ fn option_message(req: &SessionRequest) -> OptionMessage {
     msg
 }
 
-fn login_msg(req: &SessionRequest, password: Vec<u8>, session_id: u64) -> Message {
+fn login_msg(req: &SessionRequest, route: Route, password: Vec<u8>, session_id: u64) -> Message {
     let lr = LoginRequest {
         username: req.target.as_str().to_owned(),
         password: password.into(),
         my_id: req.client_id.clone(),
         my_name: req.client_name.clone(),
         my_platform: "Linux".to_owned(),
-        option: MessageField::some(option_message(req)),
+        option: MessageField::some(option_message(req, route)),
         session_id,
         version: transport::PROTOCOL_VERSION.to_owned(),
         ..Default::default()
@@ -525,7 +539,7 @@ async fn run(
                             }
                         };
                         login.sent = salted_hash;
-                        if let Err(e) = peer.send(&login_msg(&req, pw, session_id)).await {
+                        if let Err(e) = peer.send(&login_msg(&req, route, pw, session_id)).await {
                             break fail(e.to_string(), false);
                         }
                     }
@@ -679,7 +693,7 @@ async fn run(
                             login.sent = Some((s, false));
                             login.remember_pending = remember;
                             emit(SessionEvent::Phase(Phase::LoggingIn));
-                            peer.send(&login_msg(&req, pw, session_id)).await
+                            peer.send(&login_msg(&req, route, pw, session_id)).await
                         }
                     }
                     SessionCommand::TwoFactor { code } => {
@@ -701,8 +715,10 @@ async fn run(
                     }
                     SessionCommand::SetQuality(q) => {
                         req.settings.quality = q;
+                        let (image_quality, custom_image_quality) = quality_fields(q, public_relay(&req, route));
                         let m = misc_msg(|m| m.set_option(OptionMessage {
-                            image_quality: quality_enum(q).into(),
+                            image_quality: image_quality.into(),
+                            custom_image_quality,
                             ..Default::default()
                         }));
                         if connected { peer.send(&m).await } else { Ok(()) }
@@ -798,7 +814,7 @@ mod tests {
 
     #[test]
     fn login_message_disables_excluded_features() {
-        let m = login_msg(&req(), vec![], 1);
+        let m = login_msg(&req(), Route::Relay, vec![], 1);
         let lr = m.login_request();
         let o = lr.option.as_ref().unwrap();
         assert_eq!(
@@ -816,6 +832,24 @@ mod tests {
         );
         assert_eq!(lr.username, "123456789");
         assert!(lr.file_transfer().dir.is_empty());
+    }
+
+    #[test]
+    fn custom_quality_is_capped_on_the_public_relay() {
+        assert_eq!(quality_fields(Quality::Best, true), (ImageQuality::Best, 0));
+        assert_eq!(
+            quality_fields(Quality::Custom(500), false),
+            (ImageQuality::NotSet, 500 << 8)
+        );
+        assert_eq!(
+            quality_fields(Quality::Custom(500), true),
+            (ImageQuality::NotSet, 100 << 8)
+        );
+        let mut r = req();
+        r.settings.quality = Quality::Custom(1000);
+        let o = option_message(&r, Route::DirectPunch);
+        assert_eq!(o.custom_image_quality, 1000 << 8);
+        assert_eq!(o.image_quality.enum_value_or_default(), ImageQuality::NotSet);
     }
 
     #[test]

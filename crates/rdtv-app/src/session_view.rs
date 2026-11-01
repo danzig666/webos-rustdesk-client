@@ -2029,6 +2029,18 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
                 ),
                 Act::Quality(Quality::Low),
             ));
+            // Higher levels like the official client's custom quality; the public server's
+            // relay allows at most 100% (upstream `allow_more`), so they are offered only on
+            // an own server or a direct connection.
+            let public_relay = a.profile_id == "public" && a.route == Some(Route::Relay);
+            if !public_relay {
+                for q in Quality::HIGH {
+                    rows.push((
+                        format!("{}{}", if a.settings.quality == q { "● " } else { "" }, q.label()),
+                        Act::Quality(q),
+                    ));
+                }
+            }
             for fps in [30u32, 60] {
                 rows.push((
                     format!(

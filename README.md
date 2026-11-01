@@ -65,7 +65,8 @@ the screens look the same.
 * **USB/Bluetooth mice, captured from the TV**: the mouse moves only the computer's cursor, the
   TV's large pointer is hidden while you use it (it returns when you move the Magic Remote), with
   adjustable speed and Windows-style acceleration (Settings → Mouse speed / Mouse acceleration).
-* Fit / 1:1 / zoom views, keyboard shrink or overlay, monitor picker, quality controls,
+* Fit / 1:1 / zoom views, keyboard shrink or overlay, monitor picker, quality controls up to
+  **very high bitrates** (~40 Mbit/s at 1080p on own servers and direct connections),
   lock-on-disconnect.
 * Leaving the app disconnects by default (one-press Reconnect on return); optional
   keep-connected; 30-second automatic reconnect after unexpected drops.
