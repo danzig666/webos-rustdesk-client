@@ -53,12 +53,18 @@ the screens look the same.
   the picture can still be shrunk and zoomed; NDL DirectMedia and software VP9/VP8 as fallbacks.
   Remote **audio** with mute.
 * TV-first controls: Magic Remote pointing; **Red** right click, **Green** next monitor,
-  **Yellow** mouse/arrow mode, **Blue** keyboard, **Back** toolbar. Everything is also reachable
-  without colour buttons.
+  **Yellow** mouse/arrow mode, **Blue** keyboard, **Back** toolbar; number buttons **1, 2, 3…**
+  jump straight to that monitor on multi-monitor computers. Everything is also reachable without
+  colour buttons.
 * Full **on-screen keyboard**: US English and **Hungarian** layouts, Ctrl/Alt/AltGr/Shift/Win
   (once or locked), F1–F12, navigation keys, numpad, per-computer shortcut row, Ctrl+Alt+Del.
-* **USB/Bluetooth keyboards**: typing, shortcuts with held modifiers (Alt+Tab, Win+E, Ctrl+C,
-  Shift+arrows) and special keys are forwarded to the computer.
+* **USB/Bluetooth keyboards, captured from the TV**: during a session every key reaches the
+  computer, including F2, F11, F12 and Esc that webOS normally keeps for itself; shortcuts with held
+  modifiers (Alt+Tab, Win+E, Ctrl+C, Shift+arrows) and key repeat work. **Ctrl+Alt+Shift+Space**
+  opens the toolbar from the keyboard; the Magic Remote (Back opens the toolbar) is unaffected.
+* **USB/Bluetooth mice, captured from the TV**: the mouse moves only the computer's cursor, the
+  TV's large pointer is hidden while you use it (it returns when you move the Magic Remote), with
+  adjustable speed (Settings → Mouse speed).
 * Fit / 1:1 / zoom views, keyboard shrink or overlay, monitor picker, quality controls,
   lock-on-disconnect.
 * Leaving the app disconnects by default (one-press Reconnect on return); optional
@@ -71,20 +77,13 @@ the screens look the same.
 
 ## Known limitations
 
-* **Keyboard capture (all keys reach the computer).** webOS normally keeps some keyboard keys for
-  the TV: on an LG C3, **F2, F11 and F12** change TV settings and **Esc** acts as the remote's Back.
-  Since 0.6.1 RustCouch takes USB/Bluetooth keyboards away from the TV during a session (the evdev
-  grab chiaki-lg uses for controllers), so every key, F-keys and Esc included, goes to the computer,
-  held keys repeat, and the Magic Remote (Back opens the toolbar) is unaffected. Verified on an LG
-  C3 with a Logitech MX Keys Mini. **Ctrl+Alt+Shift+Space** opens the toolbar from the keyboard.
-  Settings → "Send all keyboard keys to the computer" switches it off; Settings → Diagnostics shows
-  which keyboard is captured. If a TV refuses the grab, the old behaviour applies: the on-screen
-  keyboard's **More** page (Blue button) has the missing F-keys, and Esc is sent as Esc for 10 s
-  after you last typed.
-* **Mouse capture (experimental, 0.7.0).** USB/Bluetooth mice are taken away from the TV the same
-  way during a session, so they move only the computer's cursor and the large TV pointer is hidden
-  while you use the mouse (it comes back when you move the Magic Remote). Settings → "Mouse moves
-  only the computer's cursor" switches it off.
+* **Keyboard and mouse capture** use the evdev grab that chiaki-lg uses for controllers. Verified
+  on an LG C3 with a Logitech MX Keys Mini and a Bluetooth mouse; other TVs may refuse it.
+  Settings → "Send all keyboard keys to the computer" / "Mouse moves only the computer's cursor"
+  switch them off, and Settings → Diagnostics shows what is captured. Without capture, webOS keeps
+  **F2, F11 and F12** for TV functions (use the on-screen keyboard's **More** page), Esc arrives as
+  the remote's Back (sent as Esc for 10 s after you last typed), and the TV pointer follows the
+  mouse.
 * Tested on one TV model so far (LG C3); reports from other models are welcome.
 
 ## Install
