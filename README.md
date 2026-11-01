@@ -69,6 +69,7 @@ the screens look the same.
 * **Picture quality** per computer: Low, Balanced, Best, and **Very high** 250% / 500% / 1000%
   (about 10 / 20 / 40 Mbit/s at 1080p, like the official client's custom quality; on your own
   server or a direct connection, capped at 100% through the public relay); 30/60 fps.
+  Verified: 500% at 4K over Wi-Fi on an LG C3, no dropped frames.
 * Fit / 1:1 / zoom views with smooth animation, keyboard shrink or overlay that keeps the clicked
   text field in view, monitor picker, lock-on-disconnect.
 * Leaving the app disconnects by default (one-press Reconnect on return); optional
