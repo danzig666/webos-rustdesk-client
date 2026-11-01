@@ -1,3 +1,4 @@
 ### Changes
 
-* USB/Bluetooth mice move only the computer's cursor; the TV's large pointer is hidden while the mouse is used (experimental; Settings → "Mouse moves only the computer's cursor").
+* Mouse is twice as fast by default; new Settings → "Mouse speed" (1× to 6×).
+* Remote number buttons 1, 2, 3… switch straight to that monitor when the computer has several.

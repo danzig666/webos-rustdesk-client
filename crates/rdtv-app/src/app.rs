@@ -292,7 +292,7 @@ impl App {
                 match e {
                     GrabEvent::Key(k) => a.grabbed_key(k, &self.store),
                     GrabEvent::Motion(dx, dy) => {
-                        a.grabbed_motion(dx, dy);
+                        a.grabbed_motion(dx, dy, self.store.state.settings.mouse_speed);
                         if !self.tv_cursor_hidden {
                             set_tv_cursor(false);
                             self.tv_cursor_hidden = true;

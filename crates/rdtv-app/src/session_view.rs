@@ -48,8 +48,6 @@ use std::{
 const TOOLBAR_HIDE: Duration = Duration::from_secs(5);
 const TOOLBAR_H: i32 = 104;
 const KEYBOARD_ACTIVE: Duration = Duration::from_secs(10);
-/// Screen pixels per mouse count for a captured mouse (the TV picture is 1920 wide).
-const MOUSE_SPEED: f32 = 1.0;
 /// Holding the Magic Remote wheel/OK this long without moving = right click.
 const LONG_PRESS: Duration = Duration::from_millis(500);
 /// Pointer travel (UI px) that turns a held press into a drag instead of a long press.
@@ -1225,6 +1223,21 @@ impl ActiveSession {
                 if self.menu != Menu::None {
                     return false;
                 }
+                // Remote number buttons pick the computer's monitor directly (1 = first) when
+                // it has several. Digits typed on a keyboard are told apart by recent typing:
+                // a captured keyboard never arrives here, an uncaptured one sets
+                // `keyboard_active_until` with its other keys.
+                let typing = self.keyboard_active_until.is_some_and(|t| Instant::now() < t);
+                let n = self.displays.len();
+                if let Some(d) = crate::keys::digit_of(*key).and_then(|c| c.to_digit(10)) {
+                    let plain = !(mods.ctrl || mods.alt || mods.gui || mods.shift);
+                    if n > 1 && plain && !typing && (1..=n as u32).contains(&d) {
+                        if *down && !*repeat {
+                            self.switch_monitor(d as usize - 1, store);
+                        }
+                        return true;
+                    }
+                }
                 self.physical_key(*key, *scancode, mods, *down, *repeat);
                 true
             }
@@ -1308,7 +1321,7 @@ impl ActiveSession {
 
     /// Relative movement from a captured mouse: moves a pointer over the picture (the TV's
     /// own pointer is hidden meanwhile) and the computer's cursor with it.
-    pub fn grabbed_motion(&mut self, dx: i32, dy: i32) {
+    pub fn grabbed_motion(&mut self, dx: i32, dy: i32, speed: f32) {
         if !self.connected || self.background {
             return;
         }
@@ -1323,8 +1336,8 @@ impl ActiveSession {
         let v = self.view_rect();
         let (x0, x1) = (v.x.max(0.0), (v.x + v.w).min(W as f32) - 1.0);
         let (y0, y1) = (v.y.max(0.0), (v.y + v.h).min(H as f32) - 1.0);
-        let x = (self.grab_pos.0 + dx as f32 * MOUSE_SPEED).clamp(x0, x1.max(x0));
-        let y = (self.grab_pos.1 + dy as f32 * MOUSE_SPEED).clamp(y0, y1.max(y0));
+        let x = (self.grab_pos.0 + dx as f32 * speed).clamp(x0, x1.max(x0));
+        let y = (self.grab_pos.1 + dy as f32 * speed).clamp(y0, y1.max(y0));
         self.grab_pos = (x, y);
         self.pointer_ui = (x as i32, y as i32);
         self.last_pointer = Some(Instant::now());

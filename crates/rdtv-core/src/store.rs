@@ -208,6 +208,8 @@ pub struct AppSettings {
     /// During a session, take USB/Bluetooth mice away from the TV so they move only the
     /// computer's cursor (the TV pointer stays for the Magic Remote).
     pub grab_mouse: bool,
+    /// Captured mouse: screen pixels per mouse count.
+    pub mouse_speed: f32,
 }
 
 impl Default for AppSettings {
@@ -225,6 +227,7 @@ impl Default for AppSettings {
             show_passwords: false,
             grab_keyboard: true,
             grab_mouse: true,
+            mouse_speed: 2.0,
         }
     }
 }
