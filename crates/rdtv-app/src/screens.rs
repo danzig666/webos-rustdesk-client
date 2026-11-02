@@ -172,6 +172,8 @@ struct HomeItem {
     title: String,
     subtitle: String,
     favorite: bool,
+    /// Online status, when known.
+    online: Option<bool>,
 }
 
 fn home(app: &mut App, f: &mut Frame) {
@@ -351,6 +353,7 @@ fn home(app: &mut App, f: &mut Frame) {
                     title,
                     subtitle: sub.join(" · "),
                     favorite: rec.favorite,
+                    online: None,
                 });
             }
         }
@@ -387,6 +390,7 @@ fn home(app: &mut App, f: &mut Frame) {
                     title,
                     subtitle: sub.join(" · "),
                     favorite: rec.favorite,
+                    online: None,
                 });
             }
         }
@@ -414,8 +418,34 @@ fn home(app: &mut App, f: &mut Frame) {
                     title,
                     subtitle: sub.join(" · "),
                     favorite: fav,
+                    online: None,
                 });
             }
+        }
+    }
+    // Online status for every list (Nearby computers answered on the LAN, so they are online
+    // there; the ID server is asked too, for computers that are also reachable from outside).
+    let ids: Vec<String> = pdata
+        .peers
+        .iter()
+        .filter(|(_, p)| p.favorite)
+        .map(|(k, _)| k.clone())
+        .chain(pdata.recents.iter().cloned())
+        .chain(pdata.address_book.iter().map(|p| p.id.clone()))
+        .chain(app.lan.peers.iter().map(|p| p.id.clone()))
+        .collect();
+    app.refresh_online(ids);
+    let on_lan = |id: &str| tab == 3 && app.lan.peers.iter().any(|p| p.id == id);
+    for it in items.iter_mut() {
+        it.online = if on_lan(&it.id) {
+            Some(true)
+        } else {
+            app.online.get(&profile.id, &it.id)
+        };
+        match it.online {
+            Some(true) => it.subtitle = format!("Online · {}", it.subtitle),
+            Some(false) => it.subtitle = format!("Offline · {}", it.subtitle),
+            None => {}
         }
     }
     if !q.is_empty() {
@@ -458,12 +488,20 @@ fn home(app: &mut App, f: &mut Frame) {
         } else {
             None
         };
-        if f.row(
+        let dot = it.online.map(|on| {
+            if on {
+                Color::RGB(60, 200, 110)
+            } else {
+                Color::RGB(110, 120, 140)
+            }
+        });
+        if f.row_dot(
             idx("home-row", i),
             r(780, y, 940, row_h),
             &it.title,
             &it.subtitle,
             badge,
+            dot,
         ) {
             let pid = it.id.clone();
             app.request_connect(&pid, None);

@@ -74,6 +74,8 @@ the screens look the same.
   text field in view, monitor picker, lock-on-disconnect.
 * Leaving the app disconnects by default (one-press Reconnect on return); optional
   keep-connected; 30-second automatic reconnect after unexpected drops.
+* **Online status** (green/grey dot) in Favorites, Recent, Address book and Nearby, from the ID
+  server like in the official client.
 * **Nearby**: finds the RustDesk computers on your home network, and **Wake-on-LAN** wakes them.
 * **Public server sign-in** with Google, GitHub or Microsoft via a QR code on your phone (the public
   RustDesk server requires it); accounts and address book when your server provides them.

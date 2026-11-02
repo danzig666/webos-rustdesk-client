@@ -388,15 +388,33 @@ impl<'a> Frame<'a> {
         subtitle: &str,
         badge: Option<(&str, Color)>,
     ) -> bool {
+        self.row_dot(id, r, title, subtitle, badge, None)
+    }
+
+    /// `row` with a status dot before the title (online green, offline grey).
+    pub fn row_dot(
+        &mut self,
+        id: Id,
+        r: Rect,
+        title: &str,
+        subtitle: &str,
+        badge: Option<(&str, Color)>,
+        dot: Option<Color>,
+    ) -> bool {
         let (f, a) = self.register(id, r);
         self.g.round(r, 14, if f { theme::PANEL_HI } else { theme::ROW });
         if f {
             self.focus_ring(r, 14);
         }
-        let max_w = r.width() as i32 - 48 - if badge.is_some() { 180 } else { 0 };
+        let dot_w = if dot.is_some() { 32 } else { 0 };
+        if let Some(c) = dot {
+            let ty = r.y() + 12 + (self.g.line_height(size::LARGE) - 18) / 2;
+            self.g.round(Rect::new(r.x() + 24, ty, 18, 18), 9, c);
+        }
+        let max_w = r.width() as i32 - 48 - dot_w - if badge.is_some() { 180 } else { 0 };
         self.g.text_fit(
             title,
-            r.x() + 24,
+            r.x() + 24 + dot_w,
             r.y() + 12,
             size::LARGE,
             true,

@@ -156,6 +156,7 @@ pub struct App {
     pub hwplane_error: Option<String>,
     pub updates: crate::updates::UpdateState,
     pub lan: LanScan,
+    pub online: OnlineStatus,
 }
 
 /// Leaving the app: stop input at once; disconnect when focus has not come back after this
@@ -180,6 +181,32 @@ impl LanScan {
     pub fn scanning(&self) -> bool {
         self.slot.is_some()
     }
+}
+
+/// Online status of the listed computers, from the ID server (as the RustDesk client shows
+/// it). Refreshed every 30 s while Home is open, and at once when new IDs appear.
+#[derive(Default)]
+pub struct OnlineStatus {
+    slot: Option<std::sync::Arc<std::sync::Mutex<Option<(String, Vec<String>, Result<Vec<bool>, String>)>>>>,
+    last: Option<(Instant, String, Vec<String>)>,
+    /// (profile id, computer id) → online.
+    pub known: std::collections::HashMap<(String, String), bool>,
+}
+
+const ONLINE_REFRESH: Duration = Duration::from_secs(30);
+
+impl OnlineStatus {
+    pub fn get(&self, profile: &str, id: &str) -> Option<bool> {
+        self.known.get(&(profile.to_owned(), id.to_owned())).copied()
+    }
+}
+
+/// A RustDesk ID (not an IP address or host name typed for a direct connection).
+fn is_rustdesk_id(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 64
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 impl App {
@@ -241,6 +268,7 @@ impl App {
             hwplane_error: None,
             updates: Default::default(),
             lan: Default::default(),
+            online: Default::default(),
         };
         if app.store.state.settings.check_updates {
             app.updates.start(&app.rt);
@@ -354,6 +382,63 @@ impl App {
                 *g = Some(r);
             }
         });
+    }
+
+    /// Ask the ID server about `ids` (Home's lists) when the last answer is old or the set
+    /// changed. Cheap to call every frame.
+    pub fn refresh_online(&mut self, ids: Vec<String>) {
+        if self.online.slot.is_some() {
+            return;
+        }
+        let profile = self.store.active_profile().clone();
+        let mut ids: Vec<String> = ids.into_iter().filter(|i| is_rustdesk_id(i)).collect();
+        ids.sort();
+        ids.dedup();
+        if ids.is_empty() {
+            return;
+        }
+        let fresh = self
+            .online
+            .last
+            .as_ref()
+            .is_some_and(|(t, p, last)| t.elapsed() < ONLINE_REFRESH && *p == profile.id && *last == ids);
+        if fresh {
+            return;
+        }
+        self.online.last = Some((Instant::now(), profile.id.clone(), ids.clone()));
+        let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
+        self.online.slot = Some(slot.clone());
+        let my_id = self.store.state.client_id.clone();
+        self.rt.spawn(async move {
+            let r = rdtv_core::online::query(&profile, &my_id, &ids)
+                .await
+                .map_err(|e| e.to_string());
+            if let Ok(mut g) = slot.lock() {
+                *g = Some((profile.id, ids, r));
+            }
+        });
+    }
+
+    fn poll_online(&mut self) {
+        let Some(slot) = &self.online.slot else { return };
+        let Some((profile, ids, r)) = slot.lock().ok().and_then(|mut g| g.take()) else {
+            return;
+        };
+        self.online.slot = None;
+        match r {
+            Ok(states) => {
+                for (id, on) in ids.into_iter().zip(states) {
+                    self.online.known.insert((profile.clone(), id), on);
+                }
+            }
+            // Unknown, not offline: the dots disappear rather than lie.
+            Err(e) => {
+                log::info!("online status query failed: {e}");
+                for id in ids {
+                    self.online.known.remove(&(profile.clone(), id));
+                }
+            }
+        }
     }
 
     fn poll_lan(&mut self) {
@@ -745,6 +830,7 @@ impl App {
         self.update_screensaver();
         self.updates.poll();
         self.poll_lan();
+        self.poll_online();
         while let Ok(m) = self.rx.try_recv() {
             match m {
                 AppMsg::Session(g, e) => self.handle_session_event(g, e),
