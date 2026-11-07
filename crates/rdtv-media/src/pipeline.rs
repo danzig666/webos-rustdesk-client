@@ -10,12 +10,13 @@
 //! * The network side never blocks: frames go through a bounded queue; overflow drops the
 //!   frame, flags a resync and asks for a keyframe (upstream `VIDEO_QUEUE_SIZE` behaviour).
 
-use crate::{frame::YuvFrame, ndl, smp, vpx::VpxDecoder};
+use crate::{frame::YuvFrame, ndl, pacer::Pacer, smp, vpx::VpxDecoder};
 use rdtv_core::message_proto::{video_frame, EncodedVideoFrame, VideoFrame};
 use std::{
+    collections::VecDeque,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        mpsc::{sync_channel, Receiver, SyncSender, TrySendError},
+        mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender, TrySendError},
         Arc, Mutex,
     },
     time::{Duration, Instant},
@@ -103,6 +104,8 @@ pub struct Stats {
     pub received: AtomicU64,
     pub decoded: AtomicU64,
     pub dropped: AtomicU64,
+    /// Current smooth-motion playout delay, in milliseconds.
+    pub pacing_delay_ms: AtomicU64,
 }
 
 enum Msg {
@@ -110,6 +113,7 @@ enum Msg {
     StreamSize(i32, i32),
     Reset,
     Config(PipelineConfig),
+    Pacing { smooth: bool, max_fps: u32 },
     Stop,
 }
 
@@ -148,6 +152,11 @@ impl VideoPipeline {
             last_key_request: None,
             presenting: None,
             consecutive_errors: 0,
+            smooth: false,
+            max_fps: 60,
+            pacer: Pacer::default(),
+            held: VecDeque::new(),
+            epoch: Instant::now(),
         };
         let thread = std::thread::Builder::new()
             .name("rdtv-video".into())
@@ -189,6 +198,12 @@ impl VideoPipeline {
     pub fn set_config(&self, c: PipelineConfig) {
         let _ = self.tx.try_send(Msg::Config(c));
     }
+
+    /// Smooth motion (even frame pacing) on/off, and the highest frame rate the hardware
+    /// decoder is told to expect (a change reloads it).
+    pub fn set_pacing(&self, smooth: bool, max_fps: u32) {
+        let _ = self.tx.try_send(Msg::Pacing { smooth, max_fps });
+    }
 }
 
 impl Drop for VideoPipeline {
@@ -217,9 +232,9 @@ enum HwPlayer {
 }
 
 impl HwPlayer {
-    fn load(codec: ndl::HwCodec, w: i32, h: i32) -> anyhow::Result<HwPlayer> {
+    fn load(codec: ndl::HwCodec, w: i32, h: i32, max_fps: u32) -> anyhow::Result<HwPlayer> {
         if ndl::target_window().is_some() {
-            match smp::SmpPlayer::load(codec, w, h) {
+            match smp::SmpPlayer::load(codec, w, h, max_fps) {
                 Ok(p) => {
                     ndl::set_window_state(
                         true,
@@ -290,13 +305,108 @@ struct Worker {
     last_key_request: Option<Instant>,
     presenting: Option<(Codec, bool)>,
     consecutive_errors: u32,
+    smooth: bool,
+    max_fps: u32,
+    pacer: Pacer,
+    /// Frames held by the pacer, with their release time.
+    held: VecDeque<(Instant, VideoFrame)>,
+    epoch: Instant,
+}
+
+fn first_pts(vf: &VideoFrame) -> Option<i64> {
+    match &vf.union {
+        Some(video_frame::Union::Vp9s(f))
+        | Some(video_frame::Union::Vp8s(f))
+        | Some(video_frame::Union::H264s(f))
+        | Some(video_frame::Union::H265s(f))
+        | Some(video_frame::Union::Av1s(f)) => f.frames.first().map(|x| x.pts),
+        _ => None,
+    }
 }
 
 impl Worker {
+    /// Give a frame to the pacer (or straight to the decoder when smooth motion is off).
+    fn arrive(&mut self, vf: VideoFrame) {
+        let pts = first_pts(&vf).filter(|_| self.smooth);
+        let Some(pts) = pts else {
+            return self.frame(vf);
+        };
+        let now = Instant::now();
+        let arrival = now.duration_since(self.epoch).as_secs_f64() * 1000.0;
+        let release = self.pacer.schedule(arrival, pts);
+        self.stats
+            .pacing_delay_ms
+            .store(self.pacer.delay_ms().round() as u64, Ordering::Relaxed);
+        let at = self.epoch + Duration::from_secs_f64(release.max(0.0) / 1000.0);
+        if at <= now && self.held.is_empty() {
+            self.frame(vf);
+        } else {
+            self.held.push_back((at.max(now), vf));
+        }
+        // Never let the pacer fall far behind: past a few frames, catch up at once.
+        while self.held.len() > 8 {
+            if let Some((_, f)) = self.held.pop_front() {
+                self.frame(f);
+            }
+        }
+    }
+
+    fn release_due(&mut self) {
+        let now = Instant::now();
+        while self.held.front().is_some_and(|(t, _)| *t <= now) {
+            if let Some((_, f)) = self.held.pop_front() {
+                self.frame(f);
+            }
+        }
+    }
+
+    fn drop_held(&mut self) {
+        self.held.clear();
+        self.pacer.reset();
+    }
+
     fn run(mut self) {
-        while let Ok(msg) = self.rx.recv() {
+        loop {
+            let msg = match self.held.front() {
+                Some((t, _)) => {
+                    let wait = t.saturating_duration_since(Instant::now());
+                    match self.rx.recv_timeout(wait) {
+                        Ok(m) => Some(m),
+                        Err(RecvTimeoutError::Timeout) => None,
+                        Err(RecvTimeoutError::Disconnected) => break,
+                    }
+                }
+                None => match self.rx.recv() {
+                    Ok(m) => Some(m),
+                    Err(_) => break,
+                },
+            };
+            let Some(msg) = msg else {
+                self.release_due();
+                continue;
+            };
             match msg {
-                Msg::Frame(vf) => self.frame(vf),
+                Msg::Frame(vf) => {
+                    self.release_due();
+                    self.arrive(vf);
+                }
+                Msg::Pacing { smooth, max_fps } => {
+                    if !smooth {
+                        while let Some((_, f)) = self.held.pop_front() {
+                            self.frame(f);
+                        }
+                        self.pacer.reset();
+                    }
+                    self.smooth = smooth;
+                    if max_fps != self.max_fps {
+                        self.max_fps = max_fps;
+                        if self.hw.is_some() {
+                            self.hw = None;
+                            self.presenting = None;
+                            self.resync.store(true, Ordering::SeqCst);
+                        }
+                    }
+                }
                 Msg::StreamSize(w, h) => {
                     if (w, h) != self.size {
                         self.size = (w, h);
@@ -309,6 +419,7 @@ impl Worker {
                     }
                 }
                 Msg::Reset => {
+                    self.drop_held();
                     self.hw = None;
                     self.sw = None;
                     self.presenting = None;
@@ -318,6 +429,7 @@ impl Worker {
                     }
                 }
                 Msg::Config(c) => {
+                    self.drop_held();
                     self.config = c;
                     self.hw = None;
                     self.sw = None;
@@ -391,7 +503,7 @@ impl Worker {
                 *m = None;
             }
             let (w, h) = if self.size.0 > 0 { self.size } else { (1920, 1080) };
-            match HwPlayer::load(hwc, w, h) {
+            match HwPlayer::load(hwc, w, h, self.max_fps) {
                 Ok(p) => self.hw = Some(p),
                 Err(e) => return self.fail(codec, e.to_string()),
             }

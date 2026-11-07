@@ -65,7 +65,14 @@ fn json_str(s: &str) -> String {
     o
 }
 
-pub(crate) fn load_payload(codec: HwCodec, w: i32, h: i32, app_id: &str, window: &str) -> String {
+pub(crate) fn load_payload(
+    codec: HwCodec,
+    w: i32,
+    h: i32,
+    max_fps: u32,
+    app_id: &str,
+    window: &str,
+) -> String {
     format!(
         concat!(
             r#"{{"args":[{{"mediaTransportType":"BUFFERSTREAM","option":{{"#,
@@ -81,13 +88,14 @@ pub(crate) fn load_payload(codec: HwCodec, w: i32, h: i32, app_id: &str, window:
             r#""srcBufferLevelVideo":{{"minimum":1,"maximum":1048576}}}}}},"#,
             r#""transmission":{{"contentsType":"WEBRTC"}},"#,
             r#""needAudio":false,"queryPosition":false,"lowDelayMode":true,"#,
-            r#""adaptiveStreaming":{{"audioOnly":false,"maxWidth":{w},"maxHeight":{h},"maxFrameRate":60.0}},"#,
+            r#""adaptiveStreaming":{{"audioOnly":false,"maxWidth":{w},"maxHeight":{h},"maxFrameRate":{fps}.0}},"#,
             r#""windowId":{win}}}}}]}}"#
         ),
         app = json_str(app_id),
         codec = codec_name(codec),
         w = w,
         h = h,
+        fps = max_fps.clamp(30, 120),
         win = json_str(window),
     )
 }
@@ -111,7 +119,7 @@ const WAIT_FOR_LOAD: Duration = Duration::from_millis(1500);
 const DEAD_AFTER_REFUSED: Duration = Duration::from_secs(3);
 
 impl SmpPlayer {
-    pub fn load(codec: HwCodec, width: i32, height: i32) -> Result<SmpPlayer> {
+    pub fn load(codec: HwCodec, width: i32, height: i32, max_fps: u32) -> Result<SmpPlayer> {
         available()?;
         if width <= 0 || height <= 0 || width > 8192 || height > 8192 {
             bail!("invalid stream size {width}x{height}");
@@ -119,7 +127,7 @@ impl SmpPlayer {
         let window = ndl::target_window().ok_or_else(|| anyhow!("no exported window"))?;
         let window = window.to_string_lossy().into_owned();
         let app_id = std::env::var("APPID").unwrap_or_else(|_| crate::APP_ID.to_owned());
-        let payload = load_payload(codec, width, height, &app_id, &window);
+        let payload = load_payload(codec, width, height, max_fps, &app_id, &window);
         log::info!("Starfish Load {payload}");
         let c = CString::new(payload)?;
         let raw = unsafe { rdtv_smp_load(c.as_ptr()) };
@@ -200,7 +208,8 @@ mod tests {
 
     #[test]
     fn payload_carries_window_and_codec() {
-        let p = load_payload(HwCodec::H265, 1920, 1080, "app.id", "_Window_Id_1");
+        let p = load_payload(HwCodec::H265, 1920, 1080, 120, "app.id", "_Window_Id_1");
+        assert!(p.contains(r#""maxFrameRate":120.0"#));
         assert!(p.contains(r#""windowId":"_Window_Id_1""#));
         assert!(p.contains(r#""codec":{"video":"H265"}"#));
         assert!(p.contains(r#""lowDelayMode":true"#));

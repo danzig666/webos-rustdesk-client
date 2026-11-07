@@ -150,12 +150,25 @@ pub struct PeerSettings {
     pub dpad_mode: DpadMode,
     pub shortcuts: Option<Vec<Shortcut>>,
     pub quality: Quality,
-    /// 0 = upstream default.
+    /// 0 = not chosen: 60 (`effective_fps`).
     pub fps: u32,
     pub codec: CodecPreference,
     pub muted: bool,
     pub lock_on_disconnect: bool,
     pub show_remote_cursor: bool,
+    /// Even frame pacing (a small adaptive buffer, about a frame on Wi-Fi).
+    pub smooth_motion: bool,
+}
+
+impl PeerSettings {
+    /// Frame rate asked from the computer: the chosen one, else 60 (upstream asks 30).
+    pub fn effective_fps(&self) -> u32 {
+        if self.fps == 0 {
+            60
+        } else {
+            self.fps
+        }
+    }
 }
 
 impl Default for PeerSettings {
@@ -178,6 +191,7 @@ impl Default for PeerSettings {
             muted: false,
             lock_on_disconnect: false,
             show_remote_cursor: false,
+            smooth_motion: true,
         }
     }
 }

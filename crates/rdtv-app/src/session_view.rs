@@ -277,6 +277,10 @@ impl ActiveSession {
                 let _ = tx.send(AppMsg::Pipeline(g2.load(Ordering::SeqCst), e));
             }),
         ));
+        pipe.set_pacing(
+            settings.smooth_motion,
+            if settings.effective_fps() > 60 { 120 } else { 60 },
+        );
         let paused = Arc::new(AtomicBool::new(false));
         let sink = Arc::new(Sink {
             pipe: pipe.clone(),
@@ -525,6 +529,16 @@ impl ActiveSession {
             }
             PipelineEvent::CodecFailed { .. } => {}
         }
+    }
+
+    /// Tell the video pipeline the smooth-motion and frame-rate choice.
+    pub fn apply_pacing(&self) {
+        let max_fps = if self.settings.effective_fps() > 60 {
+            120
+        } else {
+            60
+        };
+        self.pipe.set_pacing(self.settings.smooth_motion, max_fps);
     }
 
     pub fn on_codec_failed(&mut self, codec: Codec, reason: &str, caps: DecodeCaps, vp9_hw: bool) {
@@ -1877,6 +1891,7 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
     let row_h = 76;
     let gap = 12;
     enum Act {
+        SmoothMotion,
         Monitor(usize),
         View(ViewMode),
         ZoomIn,
@@ -2041,15 +2056,27 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
                     ));
                 }
             }
-            for fps in [30u32, 60] {
+            for fps in [30u32, 60, 120] {
                 rows.push((
                     format!(
-                        "{}Frame rate {fps}",
-                        if a.settings.fps == fps { "● " } else { "" }
+                        "{}Frame rate {fps}{}",
+                        if a.settings.effective_fps() == fps {
+                            "● "
+                        } else {
+                            ""
+                        },
+                        if fps == 120 { " (experimental)" } else { "" }
                     ),
                     Act::Fps(fps),
                 ));
             }
+            rows.push((
+                format!(
+                    "Smooth motion: {} (evens out frame timing, adds ~1 frame delay)",
+                    if a.settings.smooth_motion { "on" } else { "off" }
+                ),
+                Act::SmoothMotion,
+            ));
         }
         Menu::Info => {
             title = "Session info".to_owned();
@@ -2073,10 +2100,15 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             rows.push((format!("Video: {p}"), Act::Close));
             rows.push((
                 format!(
-                    "Decoded {:.0} fps · received {} · dropped {}",
+                    "Decoded {:.0} fps · received {} · dropped {}{}",
                     a.fps_count.2,
                     st.received.load(Ordering::Relaxed),
-                    st.dropped.load(Ordering::Relaxed)
+                    st.dropped.load(Ordering::Relaxed),
+                    if a.settings.smooth_motion {
+                        format!(" · smoothing {} ms", st.pacing_delay_ms.load(Ordering::Relaxed))
+                    } else {
+                        String::new()
+                    }
                 ),
                 Act::Close,
             ));
@@ -2250,8 +2282,14 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             a.handle.send(SessionCommand::SetQuality(q));
             a.save_settings(store);
         }
+        Act::SmoothMotion => {
+            a.settings.smooth_motion = !a.settings.smooth_motion;
+            a.apply_pacing();
+            a.save_settings(store);
+        }
         Act::Fps(fps) => {
             a.settings.fps = fps;
+            a.apply_pacing();
             a.handle.send(SessionCommand::SetFps(fps));
             a.save_settings(store);
         }

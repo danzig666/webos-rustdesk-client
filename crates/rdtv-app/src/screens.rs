@@ -937,10 +937,10 @@ fn peer_settings(app: &mut App, f: &mut Frame, peer: &str) {
         (
             "ps-fps",
             "Frame rate".into(),
-            if s.fps == 0 {
-                "Automatic".into()
+            if s.effective_fps() == 120 {
+                "120 fps (experimental)".into()
             } else {
-                format!("{} fps", s.fps)
+                format!("{} fps", s.effective_fps())
             },
             0,
         ),
@@ -1072,10 +1072,10 @@ fn peer_settings(app: &mut App, f: &mut Frame, peer: &str) {
                 }
             }
             "ps-fps" => {
-                s.fps = match s.fps {
-                    0 => 30,
+                s.fps = match s.effective_fps() {
                     30 => 60,
-                    _ => 0,
+                    60 => 120,
+                    _ => 30,
                 }
             }
             "ps-codec" => {

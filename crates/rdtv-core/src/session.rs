@@ -314,9 +314,7 @@ fn option_message(req: &SessionRequest, route: Route) -> OptionMessage {
     let (q, custom) = quality_fields(s.quality, public_relay(req, route));
     msg.image_quality = q.into();
     msg.custom_image_quality = custom;
-    if s.fps > 0 {
-        msg.custom_fps = s.fps as i32;
-    }
+    msg.custom_fps = s.effective_fps() as i32;
     if s.show_remote_cursor {
         msg.show_remote_cursor = bool_opt(true);
     }

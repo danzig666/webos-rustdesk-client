@@ -78,7 +78,7 @@ View, Keys, Mute, Quality, Info, Disconnect.
   computer, Escape, Windows key, Alt+Tab, Alt+F4, Double-click, **Drag lock** (the next OK presses
   and holds the left button until the following OK), Refresh video, Release stuck keys, Lock on
   disconnect, Computer settings.
-* **Quality**: Balanced (default), Best (sharpest text), Low (fast), 30/60 fps, and **Very high** 250% / 500% / 1000% (about 10 / 20 / 40 Mbit/s at 1080p, like the official client's custom quality). Very high is offered on your own server or a direct (P2P) connection; through the public server's relay quality is capped at 100%, as in the official client.
+* **Quality**: Balanced (default), Best (sharpest text), Low (fast), frame rate 30 / **60 (default)** / 120 (experimental: needs a 120 Hz+ monitor on the computer; Info shows the decoded fps), **Smooth motion** (on by default: frames are released at the rhythm the computer captured them, smoothing out uneven Wi-Fi delivery for about one frame of extra delay; Info shows the current smoothing in ms), and **Very high** 250% / 500% / 1000% (about 10 / 20 / 40 Mbit/s at 1080p, like the official client's custom quality). Very high is offered on your own server or a direct (P2P) connection; through the public server's relay quality is capped at 100%, as in the official client.
 * **Info**: codec, hardware/software decoder, frame rate, route (direct/relayed), encryption.
 
 ## On-screen keyboard

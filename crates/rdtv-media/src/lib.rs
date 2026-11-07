@@ -6,6 +6,7 @@ pub mod caps;
 pub mod frame;
 pub mod ndl;
 pub mod opus;
+pub mod pacer;
 pub mod pipeline;
 pub mod smp;
 pub mod vpx;
