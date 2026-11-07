@@ -2072,7 +2072,7 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             }
             rows.push((
                 format!(
-                    "Smooth motion: {} (evens out frame timing, adds ~1 frame delay)",
+                    "Smooth motion: {}",
                     if a.settings.smooth_motion { "on" } else { "off" }
                 ),
                 Act::SmoothMotion,
@@ -2100,16 +2100,22 @@ fn draw_menu(app: &mut App, f: &mut Frame) {
             rows.push((format!("Video: {p}"), Act::Close));
             rows.push((
                 format!(
-                    "Decoded {:.0} fps · received {} · dropped {}{}",
+                    "Decoded {:.0} fps · received {} · dropped {}",
                     a.fps_count.2,
                     st.received.load(Ordering::Relaxed),
-                    st.dropped.load(Ordering::Relaxed),
-                    if a.settings.smooth_motion {
-                        format!(" · smoothing {} ms", st.pacing_delay_ms.load(Ordering::Relaxed))
-                    } else {
-                        String::new()
-                    }
+                    st.dropped.load(Ordering::Relaxed)
                 ),
+                Act::Close,
+            ));
+            rows.push((
+                if a.settings.smooth_motion {
+                    format!(
+                        "Smooth motion: on, {} ms buffer",
+                        st.pacing_delay_ms.load(Ordering::Relaxed)
+                    )
+                } else {
+                    "Smooth motion: off".to_owned()
+                },
                 Act::Close,
             ));
             rows.push((

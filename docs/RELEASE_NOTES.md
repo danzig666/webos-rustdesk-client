@@ -1,5 +1,3 @@
 ### Changes
 
-* 60 fps by default (was the computer's default of 30).
-* Smooth motion: even frame pacing with a small adaptive buffer (Quality menu, on by default).
-* Frame rate 120 (experimental).
+* Fix: the Smooth motion details no longer get cut off in the Quality menu and Session info.
