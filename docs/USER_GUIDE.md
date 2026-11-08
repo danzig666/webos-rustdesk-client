@@ -18,6 +18,8 @@ the computer.
 Choose **Use the RustDesk public server**, or **Add my self-hosted server** (ID server, optional
 relay and API server, and the server **key** from `id_ed25519.pub`). The key lets the TV verify the
 computers it talks to. Without it, connections still work but are not verified end to end.
+Leave the API server empty to have it found automatically (`https://host` behind a reverse proxy,
+or `http://host:21114`); the Account dialog shows the address in use.
 
 ## Home
 

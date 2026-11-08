@@ -47,12 +47,17 @@ the screens look the same.
 
 ## Features
 
-* Connect by RustDesk **ID** (public server or your **self-hosted** server, as separate profiles,
-  each keeping its own sign-in; switch from the **Server** button on Home) or by **direct IP**.
-  `ID@public` reaches a computer through the public server from any profile, and an ID your own
-  server does not know is tried on the public server automatically. Password login (remembered by default, with a "Show password" option), 2FA,
-  remote approval. **Type on phone**: long passwords can be typed or pasted on your phone via a
-  QR code (one-time page on your home network).
+* Connect by RustDesk **ID** through the public server or your **self-hosted** server, or by
+  **direct IP**. Each server is a profile with its own sign-in, favourites and history; the
+  **Server** button on Home switches between them without signing in again.
+* `ID@public` reaches a computer through the public server from any profile, and an ID your own
+  server does not know is tried on the public server automatically (`ID@host?key=…` works too).
+* Account sign-in on the public server (Google/GitHub/Microsoft via a QR code) and on RustDesk Pro
+  servers (user name and password, or your server's OIDC sign-ins); the API server is found
+  automatically, including servers behind an HTTPS reverse proxy.
+* Computer password login (remembered by default, with a "Show password" option), 2FA, remote
+  approval. **Type on phone**: long passwords can be typed or pasted on your phone via a QR code
+  (one-time page on your home network).
 * **Hardware video decoding** (H.264, H.265, VP9, AV1) through the TV's Starfish media pipeline, so
   the picture can still be shrunk and zoomed; NDL DirectMedia and software VP9/VP8 as fallbacks.
   Remote **audio** with mute.
@@ -97,6 +102,21 @@ the screens look the same.
   the remote's Back (sent as Esc for 10 s after you last typed), and the TV pointer follows the
   mouse.
 * Tested on one TV model so far (LG C3); reports from other models are welcome.
+
+## Self-hosted server
+
+Settings → Server profiles → **+ Add self-hosted server** (or the **Server** button on Home →
+Manage servers…):
+
+| Field | Enter |
+|---|---|
+| ID server | your server's host name, e.g. `rustdesk.example.com` (port 21116 is the default) |
+| Relay server | empty, unless the relay runs on another host or port |
+| API server | empty to detect it, or e.g. `https://rustdesk.example.com` (Pro behind a reverse proxy) or `http://rustdesk.example.com:21114` |
+| Key | the server's public key (`id_ed25519.pub`, or Settings → Network in the RustDesk desktop app) |
+
+With the API server left empty, RustCouch tries both `https://host` and `http://host:21114` when
+you open Account & address book, and remembers the one that answers.
 
 ## Install
 
