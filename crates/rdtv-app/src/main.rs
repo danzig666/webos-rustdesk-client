@@ -7,6 +7,7 @@ mod gfx;
 mod hwplane;
 mod keys;
 mod osk;
+mod phone_input;
 mod platform;
 mod screens;
 mod session_view;

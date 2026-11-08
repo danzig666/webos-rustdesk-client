@@ -70,6 +70,39 @@ fn qr_of(url: &str) -> Option<(usize, Vec<bool>)> {
     Some((w, dark))
 }
 
+/// Draw a QR code (with its quiet zone) at most `side` pixels wide; returns its size.
+fn draw_qr(f: &mut Frame, qx: i32, qy: i32, side: i32, (w, dark): &(usize, Vec<bool>)) -> i32 {
+    let w = *w;
+    let quiet = 4;
+    let m = (side / (w as i32 + 2 * quiet)).max(1);
+    let size_px = m * (w as i32 + 2 * quiet);
+    f.g.fill(r(qx, qy, size_px, size_px), Color::RGB(255, 255, 255));
+    for row in 0..w {
+        // Runs of dark modules as one rectangle each (far fewer draw calls).
+        let mut col = 0;
+        while col < w {
+            if dark[row * w + col] {
+                let start = col;
+                while col < w && dark[row * w + col] {
+                    col += 1;
+                }
+                f.g.fill(
+                    r(
+                        qx + (quiet + start as i32) * m,
+                        qy + (quiet + row as i32) * m,
+                        (col - start) as i32 * m,
+                        m,
+                    ),
+                    Color::RGB(0, 0, 0),
+                );
+            } else {
+                col += 1;
+            }
+        }
+    }
+    size_px
+}
+
 fn provider_label(p: &str) -> String {
     match p {
         "github" => "GitHub".into(),
@@ -1624,36 +1657,8 @@ fn account_modal(app: &mut App, f: &mut Frame) {
     } else if let Some(o) = form.oidc.clone() {
         // Browser sign-in in progress: QR code of the sign-in page for a phone.
         let side = 520;
-        if let Some((w, dark)) = &o.qr {
-            let quiet = 4;
-            let m = (side / (*w as i32 + 2 * quiet)).max(1);
-            let size_px = m * (*w as i32 + 2 * quiet);
-            let qx = 400;
-            let qy = y;
-            f.g.fill(r(qx, qy, size_px, size_px), Color::RGB(255, 255, 255));
-            for row in 0..*w {
-                // Runs of dark modules as one rectangle each (far fewer draw calls).
-                let mut col = 0;
-                while col < *w {
-                    if dark[row * w + col] {
-                        let start = col;
-                        while col < *w && dark[row * w + col] {
-                            col += 1;
-                        }
-                        f.g.fill(
-                            r(
-                                qx + (quiet + start as i32) * m,
-                                qy + (quiet + row as i32) * m,
-                                (col - start) as i32 * m,
-                                m,
-                            ),
-                            Color::RGB(0, 0, 0),
-                        );
-                    } else {
-                        col += 1;
-                    }
-                }
-            }
+        if let Some(qr) = &o.qr {
+            draw_qr(f, 400, y, side, qr);
         }
         if o.qr.is_none() {
             f.g.paragraph(&o.url, 400, y, side, size::SMALL, theme::TEXT);
@@ -2262,7 +2267,15 @@ pub fn draw_editor(app: &mut App, f: &mut Frame) {
     let osk_h = ed.osk.height();
     let fy = (H - osk_h - 170).max(40);
     let shown = app.store.state.settings.show_passwords;
-    let field_w = if ed.secret { W - 660 } else { W - 400 };
+    // Text typed on the phone fills the field and confirms, as Enter would.
+    if let Some(v) = ed.phone.as_ref().and_then(|p| p.take()) {
+        ed.value = v.chars().take(512).collect();
+        app.editor = Some(ed);
+        app.finish_editor(true);
+        app.toast("Received from your phone");
+        return;
+    }
+    let field_w = if ed.secret { W - 660 } else { W - 400 } - 280;
     f.set_inert(true);
     f.field(
         id("editor-field"),
@@ -2283,6 +2296,74 @@ pub fn draw_editor(app: &mut App, f: &mut Frame) {
         )
     {
         toggle_show_passwords(app);
+    }
+    let phone_x = 200 + field_w + 20;
+    if f.button(
+        id("editor-phone"),
+        r(phone_x, fy, 260, 120),
+        if ed.phone.is_some() {
+            "Phone: on"
+        } else {
+            "Type on phone"
+        },
+        false,
+    ) {
+        if ed.phone.take().is_none() {
+            match crate::phone_input::PhoneInput::start(&app.rt, label, ed.secret) {
+                Ok(p) => {
+                    ed.phone_qr = qr_of(&p.url);
+                    ed.phone = Some(p);
+                    ed.phone_error = None;
+                }
+                Err(e) => ed.phone_error = Some(e),
+            }
+        }
+    }
+    if let Some(p) = &ed.phone {
+        // QR code of the one-time page, above the field.
+        let ph = (fy - 60).clamp(200, 440);
+        let panel = r(360, fy - ph - 20, W - 720, ph);
+        f.g.round(panel, 24, theme::PANEL);
+        let side = ph - 40;
+        if let Some(qr) = &ed.phone_qr {
+            draw_qr(f, panel.x() + 20, panel.y() + 20, side, qr);
+        }
+        let tx = panel.x() + side + 50;
+        let tw = panel.width() as i32 - side - 80;
+        let opened = p.opened.load(std::sync::atomic::Ordering::SeqCst);
+        f.g.text(
+            if opened {
+                "Opened on your phone…"
+            } else {
+                "Scan with your phone"
+            },
+            tx,
+            panel.y() + 30,
+            size::LARGE,
+            true,
+            theme::TEXT,
+        );
+        f.g.paragraph(
+            &format!(
+                "The phone must be on the same network as the TV. Type or paste there and press \"Send to TV\". The link works once, for 5 minutes.\n\n{}",
+                p.url
+            ),
+            tx,
+            panel.y() + 90,
+            tw,
+            size::SMALL,
+            theme::TEXT_DIM,
+        );
+    } else if let Some(e) = &ed.phone_error {
+        f.g.text_fit(
+            &format!("Type on phone did not start: {e}"),
+            200,
+            (fy - 50).max(0),
+            size::SMALL,
+            false,
+            theme::WARN,
+            W - 400,
+        );
     }
     f.g.text(
         "Done / Enter: confirm · Close or Back: cancel",

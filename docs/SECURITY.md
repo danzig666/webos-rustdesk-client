@@ -67,7 +67,10 @@ These rules are unchanged from upstream `Client::secure_connection`:
 
 ## Privileges and network exposure
 
-- There is no inbound listener of any kind, and no service or helper.
+- There is no service or helper, and no inbound listener except **Type on phone**: only while
+  the person has switched it on in the typing screen, a one-time page on the home network
+  (random port, random 128-bit path, plain HTTP, one submission of at most 2 KB, stops after
+  that, when the typing screen closes, or after 5 minutes). Meant for a trusted home network.
 - The app runs as the normal launcher-started user and needs no root. It never modifies the TV's jail, firmware, picture or audio settings, or other apps.
 - On a rooted TV the app still runs unprivileged when launched normally. The diagnostics screen reports the uid.
 - Update check: once per start the app fetches the catalog manifest from `raw.githubusercontent.com` (HTTPS, certificate verified, no identifiers sent beyond what any HTTPS request carries). Settings → "Check for updates" turns it off. Installing updates is always done by the Homebrew Channel, never by the app itself.

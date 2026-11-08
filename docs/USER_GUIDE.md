@@ -22,6 +22,9 @@ computers it talks to. Without it, connections still work but are not verified e
 ## Home
 
 * **Computer ID or address**: press OK and type with the on-screen or a USB keyboard, then **Connect**.
+  Long text such as a password: press **Type on phone** in the typing screen, scan the QR code
+  with a phone on the same network, type or paste there (e.g. from a password manager) and press
+  "Send to TV". The link works once and for 5 minutes.
   Or just press the remote's **number buttons**: the ID field opens with the digits already entered,
   and OK (on **Done**) connects.
 * **Favorites / Recent / Address book** tabs: OK connects; **⋯** opens options (favourite, rename,

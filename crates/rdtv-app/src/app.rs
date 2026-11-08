@@ -59,6 +59,10 @@ pub struct Editor {
     pub value: String,
     pub secret: bool,
     pub osk: Osk,
+    /// "Type on phone" page, while offered (stops when the editor closes).
+    pub phone: Option<crate::phone_input::PhoneInput>,
+    pub phone_qr: Option<(usize, Vec<bool>)>,
+    pub phone_error: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -502,6 +506,9 @@ impl App {
             value,
             secret,
             osk: Osk::new(OskMode::Local, layout),
+            phone: None,
+            phone_qr: None,
+            phone_error: None,
         });
         self.ui.want_focus = Some(crate::ui::id("osk-enter"));
     }

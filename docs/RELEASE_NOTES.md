@@ -1,3 +1,3 @@
 ### Changes
 
-* Fix: the Smooth motion details no longer get cut off in the Quality menu and Session info.
+* Type on phone: in any typing screen, scan a QR code and type or paste the text (e.g. a long password) on your phone.

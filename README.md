@@ -49,7 +49,8 @@ the screens look the same.
 
 * Connect by RustDesk **ID** (public server or your **self-hosted** server, as separate profiles) or
   by **direct IP**. Password login (remembered by default, with a "Show password" option), 2FA,
-  remote approval.
+  remote approval. **Type on phone**: long passwords can be typed or pasted on your phone via a
+  QR code (one-time page on your home network).
 * **Hardware video decoding** (H.264, H.265, VP9, AV1) through the TV's Starfish media pipeline, so
   the picture can still be shrunk and zoomed; NDL DirectMedia and software VP9/VP8 as fallbacks.
   Remote **audio** with mute.
