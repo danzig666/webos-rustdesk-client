@@ -114,8 +114,22 @@ impl ServerProfile {
     /// Pro setup with a domain name) answer on `https://host` instead, so both are probed.
     pub fn api_server_candidates(&self) -> Vec<String> {
         let api = self.api_server.trim().trim_end_matches('/');
-        if !api.is_empty() || self.kind == ProfileKind::Public {
+        if self.kind == ProfileKind::Public {
             return vec![self.effective_api_server()];
+        }
+        if !api.is_empty() {
+            // A configured plain-http address (often the upstream default copied into a
+            // config string) may be closed while the server answers on https behind a proxy.
+            let mut v = vec![api.to_owned()];
+            if let Some(rest) = api.strip_prefix("http://") {
+                let hostport = rest.split('/').next().unwrap_or(rest);
+                let host = match hostport.rsplit_once(':') {
+                    Some((h, p)) if !h.is_empty() && p.chars().all(|c| c.is_ascii_digit()) => h,
+                    _ => hostport,
+                };
+                v.push(format!("https://{host}"));
+            }
+            return v;
         }
         let s0 = self.id_server.trim();
         if s0.is_empty() {
@@ -203,6 +217,11 @@ mod tests {
         );
         p.api_server = "https://api.example.com/".into();
         assert_eq!(p.api_server_candidates(), vec!["https://api.example.com"]);
+        p.api_server = "http://rd.example.com:21114".into();
+        assert_eq!(
+            p.api_server_candidates(),
+            vec!["http://rd.example.com:21114", "https://rd.example.com"]
+        );
     }
 
     #[test]

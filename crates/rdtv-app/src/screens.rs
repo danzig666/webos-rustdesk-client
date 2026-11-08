@@ -1408,11 +1408,9 @@ fn help(_app: &mut App, f: &mut Frame) {
 /// upstream default (`http://host:21114`).
 fn api_server(app: &App) -> String {
     let p = app.store.active_profile();
-    if p.api_server.trim().is_empty() {
-        let d = app.store.profile_data(&p.id).api_detected;
-        if !d.is_empty() {
-            return d;
-        }
+    let d = app.store.profile_data(&p.id).api_detected;
+    if !d.is_empty() {
+        return d;
     }
     p.effective_api_server()
 }
@@ -1547,7 +1545,7 @@ fn poll_account(app: &mut App) {
         AccountResult::Login(Err(e)) => {
             app.account_form.oidc = None;
             app.account_form.password.clear();
-            app.account_form.status = format!("Sign-in failed: {e}");
+            app.account_form.status = format!("Sign-in failed: {e} ({})", api_server(app));
         }
         AccountResult::Book(Ok((user, book))) => {
             let d = app.store.profile_data_mut(&pid);
@@ -1630,7 +1628,7 @@ fn account_modal(app: &mut App, f: &mut Frame) {
         let mut c = account_client(app);
         let pid = p.id.clone();
         // Find the API server first (https://host or http://host:21114) when none is set.
-        let probe = p.api_server.trim().is_empty() && p.kind == ProfileKind::SelfHosted;
+        let probe = p.kind == ProfileKind::SelfHosted;
         let candidates = p.api_server_candidates();
         start_account_task(app, async move {
             let detected = if probe {
