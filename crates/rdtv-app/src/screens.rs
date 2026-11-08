@@ -277,6 +277,26 @@ fn home(app: &mut App, f: &mut Frame) {
         120, 510, 560, size::SMALL, theme::TEXT_DIM,
     );
     let pdata = app.store.profile_data(&profile.id);
+    // On a self-hosted profile, the public server's favourites are listed too (as
+    // `id@public`, so they connect through the public server), unless already a favourite here.
+    let public_favs: Vec<(String, rdtv_core::store::PeerRecord)> = if profile.kind == ProfileKind::SelfHosted
+    {
+        let mine = |id: &str| {
+            pdata
+                .peers
+                .iter()
+                .any(|(k, r)| r.favorite && (k == id || k.split('@').next() == Some(id)))
+        };
+        app.store
+            .profile_data("public")
+            .peers
+            .into_iter()
+            .filter(|(k, r)| r.favorite && !k.contains('@') && !mine(k))
+            .map(|(k, r)| (format!("{k}@public"), r))
+            .collect()
+    } else {
+        Vec::new()
+    };
     let acct = if app.store.token(&profile.id).is_some() {
         format!(
             "Signed in{}",
@@ -397,18 +417,38 @@ fn home(app: &mut App, f: &mut Frame) {
                     .iter()
                     .filter(|(_, p)| p.favorite)
                     .map(|(k, _)| k.clone())
+                    .chain(public_favs.iter().map(|(k, _)| k.clone()))
                     .collect()
             } else {
                 pdata.recents.clone()
             };
             for pid in ids {
-                let rec = pdata.peers.get(&pid).cloned().unwrap_or_default();
+                let rec = pdata
+                    .peers
+                    .get(&pid)
+                    .cloned()
+                    .or_else(|| {
+                        public_favs
+                            .iter()
+                            .find(|(k, _)| *k == pid)
+                            .map(|(_, r)| r.clone())
+                    })
+                    .unwrap_or_default();
+                // `id@public` / `id@server`: shown as the ID, with the server it goes through.
+                let (bare, via) = match pid.split_once('@') {
+                    Some((b, s)) if s.eq_ignore_ascii_case("public") => (b, Some("public server".to_owned())),
+                    Some((b, s)) => (b, Some(s.split('?').next().unwrap_or(s).to_owned())),
+                    None => (pid.as_str(), None),
+                };
                 let title = if rec.alias.is_empty() {
-                    pid.clone()
+                    bare.to_owned()
                 } else {
                     rec.alias.clone()
                 };
-                let mut sub = vec![format!("ID {pid}")];
+                let mut sub = vec![format!("ID {bare}")];
+                if let Some(v) = via {
+                    sub.push(format!("via {v}"));
+                }
                 if !rec.hostname.is_empty() {
                     sub.push(rec.hostname.clone());
                 }
@@ -463,6 +503,7 @@ fn home(app: &mut App, f: &mut Frame) {
         .iter()
         .filter(|(_, p)| p.favorite)
         .map(|(k, _)| k.clone())
+        .chain(public_favs.iter().map(|(k, _)| k.clone()))
         .chain(pdata.recents.iter().cloned())
         .chain(pdata.address_book.iter().map(|p| p.id.clone()))
         .chain(app.lan.peers.iter().map(|p| p.id.clone()))

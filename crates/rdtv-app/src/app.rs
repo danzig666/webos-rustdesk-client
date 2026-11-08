@@ -193,7 +193,7 @@ impl LanScan {
 /// it). Refreshed every 30 s while Home is open, and at once when new IDs appear.
 #[derive(Default)]
 pub struct OnlineStatus {
-    slot: Option<std::sync::Arc<std::sync::Mutex<Option<(String, Vec<String>, Result<Vec<bool>, String>)>>>>,
+    slot: Option<std::sync::Arc<std::sync::Mutex<Option<(String, Vec<String>, Vec<Option<bool>>)>>>>,
     last: Option<(Instant, String, Vec<String>)>,
     /// (profile id, computer id) → online.
     pub known: std::collections::HashMap<(String, String), bool>,
@@ -207,12 +207,59 @@ impl OnlineStatus {
     }
 }
 
-/// A RustDesk ID (not an IP address or host name typed for a direct connection).
+/// A RustDesk ID, possibly with an `@server` suffix (not an IP address or host name typed
+/// for a direct connection).
 fn is_rustdesk_id(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= 64
-        && s.chars()
+    let id = s.split('@').next().unwrap_or("");
+    !id.is_empty()
+        && id.len() <= 64
+        && id
+            .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// Online states of `ids` (as listed under `profile`): each ID is asked of the server it
+/// connects through (`id@public` of the public server), and on a self-hosted profile plain IDs
+/// are also asked of the public server, since a computer keeps its ID on every server and
+/// connecting falls back to the public one. `None` where no server could be asked.
+async fn query_online_routed(
+    profile: rdtv_core::profile::ServerProfile,
+    my_id: String,
+    ids: Vec<String>,
+) -> Vec<Option<bool>> {
+    use rdtv_core::{
+        profile::{ProfileKind, ServerProfile},
+        transport::{route_of, Target},
+    };
+    let mut groups: Vec<(ServerProfile, Vec<(usize, String)>)> = Vec::new();
+    let mut add = |server: ServerProfile, i: usize, bare: String| {
+        let same = |p: &ServerProfile| p.kind == server.kind && p.id_server == server.id_server;
+        match groups.iter_mut().find(|(p, _)| same(p)) {
+            Some((_, v)) => v.push((i, bare)),
+            None => groups.push((server, vec![(i, bare)])),
+        }
+    };
+    for (i, full) in ids.iter().enumerate() {
+        let (server, target) = route_of(&profile, &Target::Id(full.clone()));
+        let bare = target.as_str().to_owned();
+        add(server, i, bare.clone());
+        if profile.kind == ProfileKind::SelfHosted && !full.contains('@') {
+            add(ServerProfile::public(), i, bare);
+        }
+    }
+    let mut out: Vec<Option<bool>> = vec![None; ids.len()];
+    for (server, members) in groups {
+        let bare: Vec<String> = members.iter().map(|(_, b)| b.clone()).collect();
+        match rdtv_core::online::query(&server, &my_id, &bare).await {
+            Ok(states) => {
+                for ((i, _), on) in members.into_iter().zip(states) {
+                    out[i] = Some(out[i].unwrap_or(false) || on);
+                }
+            }
+            Err(e) => log::info!("online status query failed ({}): {e}", server.name),
+        }
+    }
+    out
 }
 
 impl App {
@@ -416,11 +463,10 @@ impl App {
         self.online.slot = Some(slot.clone());
         let my_id = self.store.state.client_id.clone();
         self.rt.spawn(async move {
-            let r = rdtv_core::online::query(&profile, &my_id, &ids)
-                .await
-                .map_err(|e| e.to_string());
+            let pid = profile.id.clone();
+            let r = query_online_routed(profile, my_id, ids.clone()).await;
             if let Ok(mut g) = slot.lock() {
-                *g = Some((profile.id, ids, r));
+                *g = Some((pid, ids, r));
             }
         });
     }
@@ -431,16 +477,13 @@ impl App {
             return;
         };
         self.online.slot = None;
-        match r {
-            Ok(states) => {
-                for (id, on) in ids.into_iter().zip(states) {
+        for (id, on) in ids.into_iter().zip(r) {
+            match on {
+                Some(on) => {
                     self.online.known.insert((profile.clone(), id), on);
                 }
-            }
-            // Unknown, not offline: the dots disappear rather than lie.
-            Err(e) => {
-                log::info!("online status query failed: {e}");
-                for id in ids {
+                // Unknown, not offline: the dot disappears rather than lie.
+                None => {
                     self.online.known.remove(&(profile.clone(), id));
                 }
             }
@@ -573,6 +616,12 @@ impl App {
         let peer_id = target.as_str().to_owned();
         let rec = self.store.peer(&profile.id, &peer_id);
         let mut remembered = self.store.remembered_password(&profile.id, &peer_id);
+        // `id@public` from a self-hosted profile: the password saved on the public profile.
+        if remembered.is_none() {
+            if let Some(bare) = peer_id.strip_suffix("@public") {
+                remembered = self.store.remembered_password("public", bare);
+            }
+        }
         if remembered.is_none()
             && self
                 .last_session
@@ -798,7 +847,7 @@ impl App {
                 }
                 // Not on the private server: try the public RustDesk server, as if the ID had
                 // been typed as `id@public`.
-                if end.kind == FailureKind::IdNotFound
+                if matches!(end.kind, FailureKind::IdNotFound | FailureKind::PeerOffline)
                     && self.store.active_profile().kind == rdtv_core::profile::ProfileKind::SelfHosted
                 {
                     if let Some((_, Target::Id(id))) = self.last_session.clone() {
