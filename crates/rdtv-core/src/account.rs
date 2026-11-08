@@ -308,6 +308,41 @@ fn peer_from(v: &Value) -> Option<AbPeer> {
 
 /// Legacy `data` payload: `{"tags":[...],"peers":[{id,alias,hostname,platform,tags,hash}]}`.
 /// Password hashes stored in the address book are deliberately not used here.
+/// Probe API server candidates at once and pick the best: the first (in the given order)
+/// that answers `/api/login-options` with 200, else the first that answers HTTP at all.
+pub async fn detect_api(candidates: &[String]) -> Option<String> {
+    use hbb_common::tokio;
+    let tasks: Vec<_> = candidates
+        .iter()
+        .map(|c| {
+            let url = format!("{}/api/login-options", c.trim_end_matches('/'));
+            tokio::spawn(async move {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(6),
+                    http::request("GET", &url, None, None),
+                )
+                .await
+                .ok()
+                .and_then(|r| r.ok())
+                .map(|r| r.status)
+            })
+        })
+        .collect();
+    let mut statuses = Vec::new();
+    for t in tasks {
+        statuses.push(t.await.ok().flatten());
+    }
+    log::info!(
+        "API server probe: {:?}",
+        candidates.iter().zip(&statuses).collect::<Vec<_>>()
+    );
+    let pick = statuses
+        .iter()
+        .position(|s| *s == Some(200))
+        .or_else(|| statuses.iter().position(|s| s.is_some()))?;
+    Some(candidates[pick].clone())
+}
+
 pub fn parse_login_providers(body: &str) -> Vec<String> {
     let items: Vec<String> = serde_json::from_str(body).unwrap_or_default();
     let mut out: Vec<String> = Vec::new();

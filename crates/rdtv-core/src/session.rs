@@ -296,7 +296,8 @@ fn quality_fields(q: Quality, public_relay: bool) -> (ImageQuality, i32) {
 
 /// Connected to the public RustDesk server's relay (custom quality limited to 100%).
 fn public_relay(req: &SessionRequest, route: Route) -> bool {
-    req.profile.kind == crate::profile::ProfileKind::Public && route == Route::Relay
+    transport::route_of(&req.profile, &req.target).0.kind == crate::profile::ProfileKind::Public
+        && route == Route::Relay
 }
 
 fn bool_opt(b: bool) -> hbb_common::protobuf::EnumOrUnknown<option_message::BoolOption> {
@@ -333,7 +334,10 @@ fn option_message(req: &SessionRequest, route: Route) -> OptionMessage {
 
 fn login_msg(req: &SessionRequest, route: Route, password: Vec<u8>, session_id: u64) -> Message {
     let lr = LoginRequest {
-        username: req.target.as_str().to_owned(),
+        username: transport::route_of(&req.profile, &req.target)
+            .1
+            .as_str()
+            .to_owned(),
         password: password.into(),
         my_id: req.client_id.clone(),
         my_name: req.client_name.clone(),
@@ -450,7 +454,8 @@ async fn run(
     }));
     // Establishment can be cancelled by a Disconnect command.
     let established = {
-        let fut = transport::establish(&req.profile, &req.target, req.force_relay, &req.access_token);
+        let (profile, target) = transport::route_of(&req.profile, &req.target);
+        let fut = transport::establish(&profile, &target, req.force_relay, &req.access_token);
         tokio::pin!(fut);
         loop {
             tokio::select! {

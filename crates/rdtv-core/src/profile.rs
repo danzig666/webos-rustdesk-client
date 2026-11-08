@@ -109,6 +109,32 @@ impl ServerProfile {
         }
     }
 
+    /// API servers to try when none is configured, in order of preference. Upstream only
+    /// derives `http://host:21114`, but servers behind a reverse proxy (the common RustDesk
+    /// Pro setup with a domain name) answer on `https://host` instead, so both are probed.
+    pub fn api_server_candidates(&self) -> Vec<String> {
+        let api = self.api_server.trim().trim_end_matches('/');
+        if !api.is_empty() || self.kind == ProfileKind::Public {
+            return vec![self.effective_api_server()];
+        }
+        let s0 = self.id_server.trim();
+        if s0.is_empty() {
+            return vec![];
+        }
+        // Host without a port (IPv6 literals keep their brackets).
+        let host = match s0.rsplit_once(':') {
+            Some((h, p)) if !h.is_empty() && p.chars().all(|c| c.is_ascii_digit()) && !h.ends_with(':') => h,
+            _ => s0,
+        };
+        let derived = self.effective_api_server();
+        let https = format!("https://{host}");
+        if derived.starts_with("http://") && s0 == host {
+            vec![https, derived]
+        } else {
+            vec![derived, https]
+        }
+    }
+
     /// Validation used by the profile editor.
     pub fn validate(&self) -> Result<(), String> {
         if self.name.trim().is_empty() {
@@ -158,6 +184,26 @@ impl ServerProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn api_candidates_try_https_and_21114() {
+        let mut p = ServerProfile::self_hosted("x", "Mine");
+        p.id_server = "rustdesk.example.com".into();
+        assert_eq!(
+            p.api_server_candidates(),
+            vec![
+                "https://rustdesk.example.com",
+                "http://rustdesk.example.com:21114"
+            ]
+        );
+        p.id_server = "10.0.0.5:31116".into();
+        assert_eq!(
+            p.api_server_candidates(),
+            vec!["http://10.0.0.5:31114", "https://10.0.0.5"]
+        );
+        p.api_server = "https://api.example.com/".into();
+        assert_eq!(p.api_server_candidates(), vec!["https://api.example.com"]);
+    }
 
     #[test]
     fn public_profile_defaults() {

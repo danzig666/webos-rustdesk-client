@@ -219,6 +219,8 @@ pub struct ProfileData {
     /// Address book cached from the profile's API server (no secrets).
     pub address_book: Vec<crate::account::AbPeer>,
     pub account_name: String,
+    /// API server found by probing `ServerProfile::api_server_candidates` ("" = not yet).
+    pub api_detected: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

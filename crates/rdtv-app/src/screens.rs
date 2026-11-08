@@ -121,7 +121,7 @@ fn provider_label(p: &str) -> String {
 pub enum AccountResult {
     Login(Result<LoginOutcome, String>),
     Book(Result<(String, Vec<account::AbPeer>), String>),
-    Providers(String, Result<Vec<String>, String>),
+    Providers(String, Option<String>, Result<Vec<String>, String>),
     /// provider, code, url
     OidcStarted(Result<(String, String, String), String>),
 }
@@ -218,7 +218,7 @@ fn home(app: &mut App, f: &mut Frame) {
     let srv = format!("Server: {}", profile.name);
     let sw = (f.g.text_width(&srv, size::BODY, true) + 60).min(620);
     if f.button(id("home-server"), r(W - 80 - sw - 340, 40, sw, 70), &srv, false) {
-        app.go(Screen::Profiles);
+        app.modal = Some(Modal::ServerPicker);
     }
     if f.button(
         id("home-settings"),
@@ -917,6 +917,8 @@ fn profile_edit(app: &mut App, f: &mut Frame, p: ServerProfile, is_new: bool) {
         return;
     }
     let changed_active = app.store.state.active_profile == np.id && app.active.is_some();
+    // Servers changed: find the API server again.
+    app.store.profile_data_mut(&np.id).api_detected.clear();
     if let Some(slot) = app.store.state.profiles.iter_mut().find(|x| x.id == np.id) {
         *slot = np.clone();
     } else {
@@ -1402,10 +1404,22 @@ fn help(_app: &mut App, f: &mut Frame) {
 
 // ----- account ----------------------------------------------------------------------------
 
-fn account_client(app: &App) -> account::Client {
+/// The active profile's API server: configured, else the one found by probing, else the
+/// upstream default (`http://host:21114`).
+fn api_server(app: &App) -> String {
     let p = app.store.active_profile();
+    if p.api_server.trim().is_empty() {
+        let d = app.store.profile_data(&p.id).api_detected;
+        if !d.is_empty() {
+            return d;
+        }
+    }
+    p.effective_api_server()
+}
+
+fn account_client(app: &App) -> account::Client {
     account::Client {
-        api: p.effective_api_server(),
+        api: api_server(app),
         my_id: app.store.state.client_id.clone(),
         uuid: app.store.state.client_uuid.clone(),
         device_name: crate::platform::client_name(),
@@ -1481,8 +1495,15 @@ fn poll_account(app: &mut App) {
     app.account_form.busy = false;
     let pid = app.store.state.active_profile.clone();
     match res {
-        AccountResult::Providers(profile, r) => {
+        AccountResult::Providers(profile, detected, r) => {
             app.account_form.busy = false;
+            if let Some(d) = detected {
+                let pd = app.store.profile_data_mut(&profile);
+                if pd.api_detected != d {
+                    pd.api_detected = d;
+                    app.store.save();
+                }
+            }
             if profile == pid {
                 app.account_form.providers = r.unwrap_or_default();
             }
@@ -1569,7 +1590,7 @@ pub fn sign_out(app: &mut App) {
 
 fn account_modal(app: &mut App, f: &mut Frame) {
     let p = app.store.active_profile().clone();
-    let api = p.effective_api_server();
+    let api = api_server(app);
     let panel = r(360, 120, 1200, 840);
     f.g.round(panel, 28, theme::PANEL);
     f.g.text_fit(
@@ -1606,10 +1627,25 @@ fn account_modal(app: &mut App, f: &mut Frame) {
     {
         app.account_form.providers_for = Some(p.id.clone());
         app.account_form.providers.clear();
-        let c = account_client(app);
+        let mut c = account_client(app);
         let pid = p.id.clone();
+        // Find the API server first (https://host or http://host:21114) when none is set.
+        let probe = p.api_server.trim().is_empty() && p.kind == ProfileKind::SelfHosted;
+        let candidates = p.api_server_candidates();
         start_account_task(app, async move {
-            AccountResult::Providers(pid, c.login_providers().await.map_err(|e| e.to_string()))
+            let detected = if probe {
+                account::detect_api(&candidates).await
+            } else {
+                None
+            };
+            if let Some(d) = &detected {
+                c.api = d.clone();
+            }
+            AccountResult::Providers(
+                pid,
+                detected,
+                c.login_providers().await.map_err(|e| e.to_string()),
+            )
         });
     }
     let form = app.account_form.clone();
@@ -2141,6 +2177,50 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
                 keep = false;
             }
             Modal::ReconnectPrompt
+        }
+        Modal::ServerPicker => {
+            // Each profile keeps its own sign-in, so switching needs no new sign-in.
+            let list = app.store.state.profiles.clone();
+            let active = app.store.state.active_profile.clone();
+            let shown = list.len().min(6);
+            let ph = 150 + shown as i32 * 100 + 110;
+            let panel = r(560, (H - ph) / 2, 800, ph);
+            f.g.round(panel, 28, theme::PANEL);
+            f.g.text(
+                "Switch server",
+                610,
+                panel.y() + 40,
+                size::TITLE,
+                true,
+                theme::TEXT,
+            );
+            let mut y = panel.y() + 130;
+            let mut pick = None;
+            for (i, p) in list.iter().take(shown).enumerate() {
+                let signed = app.store.token(&p.id).is_some();
+                let label = format!(
+                    "{}{}{}",
+                    if p.id == active { "● " } else { "" },
+                    p.name,
+                    if signed { " · signed in" } else { "" }
+                );
+                if f.button(idx("sp-row", i), r(610, y, 700, 86), &label, p.id == active) {
+                    pick = Some(p.id.clone());
+                }
+                y += 100;
+            }
+            let manage = f.button(id("sp-manage"), r(610, y, 700, 86), "Manage servers…", false);
+            if let Some(pid) = pick {
+                app.modal = None;
+                app.switch_profile(&pid);
+                return;
+            }
+            if manage {
+                app.modal = None;
+                app.go(Screen::Profiles);
+                return;
+            }
+            Modal::ServerPicker
         }
         Modal::PeerMenu(peer) => {
             let pid = app.store.state.active_profile.clone();

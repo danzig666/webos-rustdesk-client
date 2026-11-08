@@ -89,7 +89,7 @@ impl Target {
         }
         if !id
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '@' || c == '.')
+            .all(|c| c.is_ascii_alphanumeric() || "-_@.:?=".contains(c))
         {
             return None;
         }
@@ -101,6 +101,34 @@ impl Target {
             Target::Id(s) | Target::Address(s) => s,
         }
     }
+}
+
+/// Upstream's `id@server` form: `id@public` reaches the computer through the public
+/// RustDesk server, `id@host[:port][?key=K]` through that server, whatever profile is
+/// active. Returns the server profile to use and the bare ID; other targets are unchanged.
+pub fn route_of(profile: &ServerProfile, target: &Target) -> (ServerProfile, Target) {
+    let Target::Id(full) = target else {
+        return (profile.clone(), target.clone());
+    };
+    let Some((id, server)) = full.split_once('@') else {
+        return (profile.clone(), target.clone());
+    };
+    if id.is_empty() || server.is_empty() {
+        return (profile.clone(), target.clone());
+    }
+    let routed = if server.eq_ignore_ascii_case("public") {
+        ServerProfile::public()
+    } else {
+        let (host, key) = match server.split_once("?key=") {
+            Some((h, k)) => (h, k),
+            None => (server, ""),
+        };
+        let mut p = ServerProfile::self_hosted(format!("@{host}"), host);
+        p.id_server = host.to_owned();
+        p.key = key.to_owned();
+        p
+    };
+    (routed, Target::Id(id.to_owned()))
 }
 
 pub(crate) fn get_pk(pk: &[u8]) -> Option<[u8; 32]> {
@@ -517,6 +545,27 @@ async fn establish_by_id(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn id_at_server_routes() {
+        let mine = {
+            let mut p = ServerProfile::self_hosted("mine", "Mine");
+            p.id_server = "rs.example.com".into();
+            p
+        };
+        let (p, t) = route_of(&mine, &Target::Id("123456789@public".into()));
+        assert_eq!(p.kind, crate::profile::ProfileKind::Public);
+        assert_eq!(t, Target::Id("123456789".into()));
+        let (p, t) = route_of(&mine, &Target::Id("42@other.org:21116?key=ABC".into()));
+        assert_eq!((p.id_server.as_str(), p.key.as_str()), ("other.org:21116", "ABC"));
+        assert_eq!(t, Target::Id("42".into()));
+        let (p, t) = route_of(&mine, &Target::Id("123456789".into()));
+        assert_eq!((p.id.as_str(), t), ("mine", Target::Id("123456789".into())));
+        assert_eq!(
+            Target::parse("123 456 789@public"),
+            Some(Target::Id("123456789@public".into()))
+        );
+    }
 
     #[test]
     fn target_parsing() {

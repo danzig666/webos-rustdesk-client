@@ -113,6 +113,8 @@ pub enum Modal {
     ReconnectPrompt,
     PeerMenu(String),
     Account,
+    /// Quick server switch from Home.
+    ServerPicker,
 }
 
 pub enum AppMsg {
@@ -598,7 +600,18 @@ impl App {
             client_id: self.store.state.client_id.clone(),
             client_name: crate::platform::client_name(),
             force_relay: false,
-            access_token: self.store.token(&profile.id).unwrap_or_default().to_owned(),
+            access_token: {
+                // `id@public` / `id@server` go through another server: its own sign-in.
+                let (routed, _) = rdtv_core::transport::route_of(&profile, &target);
+                let pid = if routed.id == profile.id {
+                    profile.id.as_str()
+                } else if routed.kind == rdtv_core::profile::ProfileKind::Public {
+                    "public"
+                } else {
+                    ""
+                };
+                self.store.token(pid).unwrap_or_default().to_owned()
+            },
         };
         let ring = Arc::new(rdtv_media::audio::AudioRing::new(250));
         ring.set_muted(rec.settings.muted);
@@ -781,6 +794,19 @@ impl App {
                             reason: end.message.clone(),
                         });
                         return;
+                    }
+                }
+                // Not on the private server: try the public RustDesk server, as if the ID had
+                // been typed as `id@public`.
+                if end.kind == FailureKind::IdNotFound
+                    && self.store.active_profile().kind == rdtv_core::profile::ProfileKind::SelfHosted
+                {
+                    if let Some((_, Target::Id(id))) = self.last_session.clone() {
+                        if !id.contains('@') {
+                            self.toast(format!("{id} is not on your server; trying the public server"));
+                            self.connect(Target::Id(format!("{id}@public")), None);
+                            return;
+                        }
                     }
                 }
                 self.modal = Some(Modal::Failed {

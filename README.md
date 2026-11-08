@@ -47,8 +47,10 @@ the screens look the same.
 
 ## Features
 
-* Connect by RustDesk **ID** (public server or your **self-hosted** server, as separate profiles) or
-  by **direct IP**. Password login (remembered by default, with a "Show password" option), 2FA,
+* Connect by RustDesk **ID** (public server or your **self-hosted** server, as separate profiles,
+  each keeping its own sign-in; switch from the **Server** button on Home) or by **direct IP**.
+  `ID@public` reaches a computer through the public server from any profile, and an ID your own
+  server does not know is tried on the public server automatically. Password login (remembered by default, with a "Show password" option), 2FA,
   remote approval. **Type on phone**: long passwords can be typed or pasted on your phone via a
   QR code (one-time page on your home network).
 * **Hardware video decoding** (H.264, H.265, VP9, AV1) through the TV's Starfish media pipeline, so
