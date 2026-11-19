@@ -1,0 +1,14 @@
+{
+  "id": "io.github.danzig666.remotedesktv",
+  "version": "0.12.0",
+  "type": "native",
+  "title": "RustCouch",
+  "appDescription": "RustDesk-compatible remote desktop client (community project)",
+  "iconUri": "https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/icon.png",
+  "sourceUrl": "https://github.com/danzig666/webos-rustdesk-client",
+  "rootRequired": false,
+  "ipkUrl": "https://github.com/danzig666/webos-rustdesk-client/releases/download/v0.12.0/io.github.danzig666.remotedesktv_0.12.0_arm.ipk",
+  "ipkHash": {
+    "sha256": "18201914fb58c1a1307af43116dc6c4646b14fc59f6f04b4f0be43fc639abe39"
+  }
+}
