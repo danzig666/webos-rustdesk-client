@@ -82,6 +82,9 @@ pub enum Modal {
         remember: bool,
     },
     TwoFactor {
+        /// "Trust this TV" ticked (offered by the host).
+        trust: bool,
+        trust_offered: bool,
         wrong: bool,
         value: String,
     },
@@ -115,6 +118,8 @@ pub enum Modal {
     Account,
     /// Quick server switch from Home.
     ServerPicker,
+    /// A newer version: install it through Homebrew Channel.
+    Update,
 }
 
 pub enum AppMsg {
@@ -142,6 +147,8 @@ pub struct App {
     pub log_path: std::path::PathBuf,
     pub focus_lost_at: Option<Instant>,
     pub kbgrab: crate::evgrab::InputGrab,
+    /// "Trust this TV" was ticked at 2FA: remember it for the computer once connected.
+    pending_trust: bool,
     /// The TV's own pointer is hidden because a captured mouse is in use.
     tv_cursor_hidden: bool,
     /// Last remote/keyboard/pointer input, for the screen saver policy.
@@ -306,6 +313,7 @@ impl App {
             log_path,
             focus_lost_at: None,
             kbgrab: Default::default(),
+            pending_trust: false,
             tv_cursor_hidden: false,
             last_input: Instant::now(),
             screensaver_blocked: None,
@@ -649,6 +657,11 @@ impl App {
             client_id: self.store.state.client_id.clone(),
             client_name: crate::platform::client_name(),
             force_relay: false,
+            hwid: {
+                use rdtv_core::hbb_common::sha2::{Digest, Sha256};
+                Sha256::digest(self.store.state.client_uuid.as_bytes()).to_vec()
+            },
+            trusted: rec.settings.trust_2fa,
             access_token: {
                 // `id@public` / `id@server` go through another server: its own sign-in.
                 let (routed, _) = rdtv_core::transport::route_of(&profile, &target);
@@ -780,10 +793,18 @@ impl App {
                 });
                 self.ui.want_focus = Some(crate::ui::id("pw-field"));
             }
-            SessionEvent::TwoFactorRequired { wrong } => {
+            SessionEvent::TwoFactorRequired { wrong, trust_offered } => {
+                // A code is asked although this TV was trusted: forget that.
+                if self.store.peer(&pid, &peer_id).settings.trust_2fa {
+                    self.store.peer_mut(&pid, &peer_id).settings.trust_2fa = false;
+                    self.store.save();
+                }
+                self.pending_trust = false;
                 self.modal = Some(Modal::TwoFactor {
                     wrong,
                     value: String::new(),
+                    trust: trust_offered,
+                    trust_offered,
                 });
             }
             SessionEvent::RememberHash(h) => {
@@ -801,6 +822,9 @@ impl App {
                 session_hash,
             } => {
                 self.last_session_hash = session_hash;
+                if std::mem::take(&mut self.pending_trust) {
+                    self.store.peer_mut(&pid, &peer_id).settings.trust_2fa = true;
+                }
                 active.on_connected(peer.clone(), route, secured);
                 self.store
                     .note_connected(&pid, &peer_id, &peer.hostname, &peer.platform);
@@ -1195,9 +1219,18 @@ impl App {
     }
 
     pub fn submit_2fa(&mut self) {
-        if let Some(Modal::TwoFactor { value, .. }) = self.modal.take() {
+        if let Some(Modal::TwoFactor {
+            value,
+            trust,
+            trust_offered,
+            ..
+        }) = self.modal.take()
+        {
             if let Some(a) = self.active.as_ref() {
-                a.handle.send(session::SessionCommand::TwoFactor { code: value });
+                let trust = trust && trust_offered;
+                self.pending_trust = trust;
+                a.handle
+                    .send(session::SessionCommand::TwoFactor { code: value, trust });
                 self.modal = Some(Modal::Connecting {
                     phase: session::Phase::LoggingIn,
                     since: Instant::now(),

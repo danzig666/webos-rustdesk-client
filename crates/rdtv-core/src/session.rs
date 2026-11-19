@@ -97,6 +97,11 @@ pub struct SessionRequest {
     pub force_relay: bool,
     /// Account access token for this profile ("" when signed out), sent to the ID server.
     pub access_token: String,
+    /// This TV's hardware id for trusted devices (upstream `get_hwid`: sha256 of the client
+    /// uuid), and whether to present it at login (the user ticked "trust this device" at an
+    /// earlier 2FA on this computer; the host then skips the 2FA code).
+    pub hwid: Vec<u8>,
+    pub trusted: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,6 +173,8 @@ pub enum SessionEvent {
     },
     TwoFactorRequired {
         wrong: bool,
+        /// The host offers "trust this device" (upstream `enable_trusted_devices`).
+        trust_offered: bool,
     },
     Connected {
         peer: PeerSummary,
@@ -224,6 +231,7 @@ pub enum SessionCommand {
     },
     TwoFactor {
         code: String,
+        trust: bool,
     },
     SwitchDisplay(i32),
     RefreshVideo(i32),
@@ -343,6 +351,11 @@ fn login_msg(req: &SessionRequest, route: Route, password: Vec<u8>, session_id: 
         my_name: req.client_name.clone(),
         my_platform: "Linux".to_owned(),
         option: MessageField::some(option_message(req, route)),
+        hwid: if req.trusted {
+            req.hwid.clone().into()
+        } else {
+            Default::default()
+        },
         session_id,
         version: transport::PROTOCOL_VERSION.to_owned(),
         ..Default::default()
@@ -560,7 +573,12 @@ async fn run(
                                 login.sent = None;
                                 emit(SessionEvent::PasswordRequired { wrong: true });
                             } else if err == REQUIRE_2FA || err == LOGIN_MSG_2FA_WRONG {
-                                emit(SessionEvent::TwoFactorRequired { wrong: err == LOGIN_MSG_2FA_WRONG });
+                                // Asked again although trusted: the host dropped this device.
+                                req.trusted = false;
+                                emit(SessionEvent::TwoFactorRequired {
+                                    wrong: err == LOGIN_MSG_2FA_WRONG,
+                                    trust_offered: lr.enable_trusted_devices,
+                                });
                             } else if err == LOGIN_MSG_NO_PASSWORD_ACCESS {
                                 emit(SessionEvent::Phase(Phase::WaitingApproval));
                             } else {
@@ -699,9 +717,14 @@ async fn run(
                             peer.send(&login_msg(&req, route, pw, session_id)).await
                         }
                     }
-                    SessionCommand::TwoFactor { code } => {
+                    SessionCommand::TwoFactor { code, trust } => {
                         let mut m = Message::new();
-                        m.set_auth_2fa(Auth2FA { code, ..Default::default() });
+                        m.set_auth_2fa(Auth2FA {
+                            code,
+                            hwid: if trust { req.hwid.clone().into() } else { Default::default() },
+                            ..Default::default()
+                        });
+                        req.trusted = trust;
                         peer.send(&m).await
                     }
                     SessionCommand::SwitchDisplay(d) => {
@@ -812,6 +835,8 @@ mod tests {
             client_name: "LG TV".into(),
             force_relay: false,
             access_token: String::new(),
+            hwid: vec![7; 32],
+            trusted: false,
         }
     }
 
@@ -834,6 +859,16 @@ mod tests {
             (1, 1, 1, 0)
         );
         assert_eq!(lr.username, "123456789");
+        assert!(lr.hwid.is_empty());
+        let mut trusted = req();
+        trusted.trusted = true;
+        assert_eq!(
+            login_msg(&trusted, Route::Relay, vec![], 1)
+                .login_request()
+                .hwid
+                .len(),
+            32
+        );
         assert!(lr.file_transfer().dir.is_empty());
     }
 

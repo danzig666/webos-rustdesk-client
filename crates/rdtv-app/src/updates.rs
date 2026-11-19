@@ -6,11 +6,69 @@
 //! does not notify by itself, so the app checks the catalog's manifest (one small HTTPS request
 //! per start, switchable off) and shows a notice on Home.
 //!
+//! Installing in the app (as in the author's ytnative): the manifest names the package and
+//! its SHA-256, and the app hands both to Homebrew Channel's service
+//! (`luna://org.webosbrew.hbchannel.service/install`), which downloads, verifies and installs
+//! it; an app may not install packages itself, and installing closes it.
+//!
 //! The Homebrew Channel's own launch parameter `{"launchMode":"addRepository","url":…}` opens its
 //! settings with the repository URL filled in (webosbrew/webos-homebrew-channel
 //! `frontend/views/MainView.js`), so adding the catalog needs no typing on the remote.
 
 use std::sync::{Arc, Mutex};
+
+pub const NEEDS_HBCHANNEL: &str = "Homebrew Channel is needed to install updates";
+
+/// A release from the catalog manifest.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Release {
+    pub version: String,
+    pub ipk_url: String,
+    pub sha256: String,
+}
+
+pub fn parse_manifest(json: &str) -> Option<Release> {
+    let v: serde_json::Value = serde_json::from_str(json).ok()?;
+    Some(Release {
+        version: v["version"].as_str()?.to_string(),
+        ipk_url: v["ipkUrl"].as_str()?.to_string(),
+        sha256: v["ipkHash"]["sha256"].as_str()?.to_string(),
+    })
+}
+
+/// Progress of an install handed to Homebrew Channel.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Install {
+    Idle,
+    /// Downloading (percent, when Homebrew Channel says).
+    Downloading(Option<u32>),
+    Installing,
+    Installed,
+    Failed(String),
+}
+
+/// One reply of Homebrew Channel's install, read into a state (None: nothing to show).
+pub fn read_install_reply(reply: &str) -> Option<Install> {
+    let v: serde_json::Value = serde_json::from_str(reply).ok()?;
+    if v["returnValue"] == serde_json::Value::Bool(false) || v.get("errorText").is_some() {
+        let t = v["errorText"].as_str().unwrap_or("the installer refused");
+        // No Homebrew Channel on this TV: the bus answers for the missing service.
+        if t.contains("does not exist") || t.contains("Unknown service") {
+            return Some(Install::Failed(NEEDS_HBCHANNEL.into()));
+        }
+        return Some(Install::Failed(t.to_string()));
+    }
+    if v["finished"] == serde_json::Value::Bool(true) {
+        return Some(Install::Installed);
+    }
+    match v["statusText"].as_str() {
+        Some(t) if t.starts_with("Download") => Some(Install::Downloading(
+            v["progress"].as_f64().map(|p| p.clamp(0.0, 100.0) as u32),
+        )),
+        Some(t) if t.starts_with("Verif") || t.starts_with("Install") => Some(Install::Installing),
+        _ => None,
+    }
+}
 
 pub const CATALOG_URL: &str =
     "https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/apps.json";
@@ -38,10 +96,14 @@ pub fn is_newer(latest: &str, current: &str) -> bool {
 
 #[derive(Default)]
 pub struct UpdateState {
-    slot: Option<Arc<Mutex<Option<Result<String, String>>>>>,
+    slot: Option<Arc<Mutex<Option<Result<Release, String>>>>>,
     /// Newest version in the catalog, once known.
     pub latest: Option<String>,
+    pub release: Option<Release>,
     pub error: Option<String>,
+    install: Option<Arc<Mutex<Install>>>,
+    /// The "update available" question was shown this run.
+    pub prompted: bool,
 }
 
 impl UpdateState {
@@ -50,10 +112,9 @@ impl UpdateState {
         self.slot = Some(slot.clone());
         rt.spawn(async move {
             let r = match rdtv_core::http::request("GET", MANIFEST_URL, None, None).await {
-                Ok(resp) if resp.status == 200 => serde_json::from_str::<serde_json::Value>(&resp.body)
-                    .ok()
-                    .and_then(|v| v.get("version")?.as_str().map(str::to_owned))
-                    .ok_or_else(|| "catalog manifest has no version".to_owned()),
+                Ok(resp) if resp.status == 200 => {
+                    parse_manifest(&resp.body).ok_or_else(|| "catalog manifest is incomplete".to_owned())
+                }
                 Ok(resp) => Err(format!("catalog returned HTTP {}", resp.status)),
                 Err(e) => Err(e.to_string()),
             };
@@ -70,9 +131,11 @@ impl UpdateState {
         if let Some(r) = r {
             self.slot = None;
             match r {
-                Ok(v) => {
-                    log::info!("catalog: latest {v}, running {}", current_version());
-                    self.latest = Some(v);
+                Ok(r) => {
+                    log::info!("catalog: latest {}, running {}", r.version, current_version());
+                    self.latest = Some(r.version.clone());
+                    self.release = Some(r);
+                    self.error = None;
                 }
                 Err(e) => {
                     log::info!("update check failed: {e}");
@@ -84,6 +147,73 @@ impl UpdateState {
 
     pub fn available(&self) -> Option<&str> {
         self.latest.as_deref().filter(|l| is_newer(l, current_version()))
+    }
+
+    pub fn checking(&self) -> bool {
+        self.slot.is_some()
+    }
+
+    pub fn install_state(&self) -> Install {
+        self.install
+            .as_ref()
+            .and_then(|s| s.lock().ok().map(|g| g.clone()))
+            .unwrap_or(Install::Idle)
+    }
+
+    /// Hand the newer release to Homebrew Channel, which downloads, verifies (SHA-256) and
+    /// installs it. Installing closes the app.
+    pub fn install(&mut self) {
+        let Some(rel) = self
+            .release
+            .clone()
+            .filter(|r| is_newer(&r.version, current_version()))
+        else {
+            return;
+        };
+        if matches!(
+            self.install_state(),
+            Install::Downloading(_) | Install::Installing | Install::Installed
+        ) {
+            return;
+        }
+        let state = Arc::new(Mutex::new(Install::Downloading(None)));
+        self.install = Some(state.clone());
+        log::info!("update: installing {} through Homebrew Channel", rel.version);
+        let payload = serde_json::json!({
+            "ipkUrl": rel.ipk_url, "ipkHash": rel.sha256, "id": rdtv_media::APP_ID, "subscribe": true,
+        })
+        .to_string();
+        let sent = match crate::luna::Luna::wide(rdtv_media::APP_ID) {
+            Ok(luna) => {
+                let st = state.clone();
+                luna.subscribe(
+                    "luna://org.webosbrew.hbchannel.service/install",
+                    &payload,
+                    move |reply| {
+                        if let Some(s) = read_install_reply(reply) {
+                            if let Install::Failed(e) = &s {
+                                log::warn!("update: install failed: {e}");
+                            }
+                            if let Ok(mut g) = st.lock() {
+                                // A late reply never turns a failure back into progress.
+                                if !matches!(*g, Install::Failed(_) | Install::Installed) {
+                                    *g = s;
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+            Err(e) => {
+                log::warn!("update: no bus: {e}");
+                false
+            }
+        };
+        if !sent {
+            if let Ok(mut g) = state.lock() {
+                *g = Install::Failed(NEEDS_HBCHANNEL.into());
+            }
+        }
     }
 }
 
@@ -127,6 +257,34 @@ pub fn open_hbchannel(add_catalog: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manifest_and_install_replies() {
+        let r =
+            parse_manifest(r#"{"version":"0.11.2","ipkUrl":"https://x/a.ipk","ipkHash":{"sha256":"ab"}}"#)
+                .unwrap();
+        assert_eq!((r.version.as_str(), r.sha256.as_str()), ("0.11.2", "ab"));
+        assert!(parse_manifest(r#"{"version":"0.11.2"}"#).is_none());
+        assert_eq!(
+            read_install_reply(r#"{"statusText":"Downloading…","progress":41.7}"#),
+            Some(Install::Downloading(Some(41)))
+        );
+        assert_eq!(
+            read_install_reply(r#"{"statusText":"Installing…"}"#),
+            Some(Install::Installing)
+        );
+        assert_eq!(
+            read_install_reply(r#"{"statusText":"Finished.","finished":true}"#),
+            Some(Install::Installed)
+        );
+        assert_eq!(
+            read_install_reply(
+                r#"{"returnValue":false,"errorText":"Service does not exist: org.webosbrew.hbchannel.service."}"#
+            ),
+            Some(Install::Failed(NEEDS_HBCHANNEL.into()))
+        );
+        assert_eq!(read_install_reply(r#"{"returnValue":true}"#), None);
+    }
 
     #[test]
     fn version_comparison() {

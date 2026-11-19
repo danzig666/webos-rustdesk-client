@@ -6,6 +6,7 @@ mod evgrab;
 mod gfx;
 mod hwplane;
 mod keys;
+mod luna;
 mod osk;
 mod phone_input;
 mod platform;
@@ -21,6 +22,12 @@ use std::time::{Duration, Instant};
 pub static SDL_DESC: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 fn main() {
+    // Upstream #16974: initialise libsodium once, before any thread uses it. A first
+    // sodium_init() can switch implementations under an operation running on another
+    // thread (wrong secretbox tags). It only fails when it cannot take its own lock.
+    if rdtv_core::hbb_common::sodiumoxide::init().is_err() {
+        eprintln!("libsodium initialisation failed; continuing");
+    }
     if std::env::args().any(|a| a == "--self-test") {
         std::process::exit(self_test());
     }

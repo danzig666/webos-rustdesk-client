@@ -158,6 +158,9 @@ pub struct PeerSettings {
     pub show_remote_cursor: bool,
     /// Even frame pacing (a small adaptive buffer, about a frame on Wi-Fi).
     pub smooth_motion: bool,
+    /// The user ticked "trust this TV" at this computer's 2FA: present the hardware id at
+    /// login so the host skips the code (cleared when the host asks for a code again).
+    pub trust_2fa: bool,
 }
 
 impl PeerSettings {
@@ -192,6 +195,7 @@ impl Default for PeerSettings {
             lock_on_disconnect: false,
             show_remote_cursor: false,
             smooth_motion: true,
+            trust_2fa: false,
         }
     }
 }

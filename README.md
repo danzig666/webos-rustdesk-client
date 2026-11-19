@@ -26,8 +26,11 @@ https://raw.githubusercontent.com/danzig666/webos-rustdesk-client/homebrew-repo/
 
 1. In the Homebrew Channel: **Settings → Add repository**, enter the URL above.
 2. **RustCouch** appears in the app list: open it and choose **Install**.
-3. Updates: when a new version is out, RustCouch shows **Update … available** on its Home
-   screen; it opens the Homebrew Channel, where the app's page offers **Update**.
+3. Updates install from inside the app: when a new version is out, RustCouch asks once
+   (**Update to …**) and keeps an **Update … available** button on Home; **Install now** hands the
+   package to the Homebrew Channel, which downloads it, checks its SHA-256 and installs it
+   (RustCouch closes meanwhile; open it again). Settings → **Check for updates now** checks on
+   demand. Without the Homebrew Channel, the catalog's **Update** button there still works.
 
 Already installed from an `.ipk`? **Settings → Add the RustCouch catalog to the Homebrew Channel**
 opens the Homebrew Channel with the URL filled in. Other ways to install (Dev Manager, SSH,
@@ -55,8 +58,8 @@ the screens look the same.
 * Account sign-in on the public server (Google/GitHub/Microsoft via a QR code) and on RustDesk Pro
   servers (user name and password, or your server's OIDC sign-ins); the API server is found
   automatically, including servers behind an HTTPS reverse proxy.
-* Computer password login (remembered by default, with a "Show password" option), 2FA, remote
-  approval. **Type on phone**: long passwords can be typed or pasted on your phone via a QR code
+* Computer password login (remembered by default, with a "Show password" option), 2FA with
+  **Trust this TV** (the computer skips the code next time), remote approval. **Type on phone**: long passwords can be typed or pasted on your phone via a QR code
   (one-time page on your home network).
 * **Hardware video decoding** (H.264, H.265, VP9, AV1) through the TV's Starfish media pipeline, so
   the picture can still be shrunk and zoomed; NDL DirectMedia and software VP9/VP8 as fallbacks.

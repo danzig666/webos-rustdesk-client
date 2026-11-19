@@ -231,6 +231,15 @@ fn home(app: &mut App, f: &mut Frame) {
     if f.button(id("home-help"), r(W - 80 - 150, 40, 150, 70), "Help", false) {
         app.go(Screen::Help);
     }
+    // A newer version: ask once per run (then the header button stays).
+    if app.updates.available().is_some()
+        && !app.updates.prompted
+        && app.modal.is_none()
+        && app.editor.is_none()
+    {
+        app.updates.prompted = true;
+        app.modal = Some(Modal::Update);
+    }
     // Newer version in the Homebrew Channel catalog: one button to go and update.
     if let Some(latest) = app.updates.available().map(str::to_owned) {
         let label = format!("Update {latest} available");
@@ -243,9 +252,7 @@ fn home(app: &mut App, f: &mut Frame) {
                 true,
             )
         {
-            if let Err(e) = crate::updates::open_hbchannel(false) {
-                app.toast(format!("Open the Homebrew Channel to update ({e})"));
-            }
+            app.modal = Some(Modal::Update);
         }
     }
 
@@ -667,6 +674,18 @@ fn settings(app: &mut App, f: &mut Frame) {
             if s.check_updates { 2 } else { 1 },
         ),
         (
+            "set-updnow",
+            match app.updates.available() {
+                Some(v) => format!("Install update {v} now"),
+                None if app.updates.checking() => "Checking for updates…".into(),
+                None => format!(
+                    "Check for updates now (running {})",
+                    crate::updates::current_version()
+                ),
+            },
+            0,
+        ),
+        (
             "set-catalog",
             "Add the RustCouch catalog to the Homebrew Channel (for updates)".into(),
             0,
@@ -732,6 +751,14 @@ fn settings(app: &mut App, f: &mut Frame) {
             st.check_updates = !st.check_updates;
             if st.check_updates {
                 app.updates.start(&app.rt);
+            }
+        }
+        "set-updnow" => {
+            if app.updates.available().is_some() {
+                app.modal = Some(Modal::Update);
+            } else if !app.updates.checking() {
+                app.updates.start(&app.rt);
+                app.toast("Checking for updates…");
             }
         }
         "set-catalog" => {
@@ -2033,8 +2060,13 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
             }
             m
         }
-        Modal::TwoFactor { wrong, value } => {
-            let panel = r(410, 250, 1100, 520);
+        Modal::TwoFactor {
+            wrong,
+            value,
+            mut trust,
+            trust_offered,
+        } => {
+            let panel = r(410, 250, 1100, if trust_offered { 620 } else { 520 });
             f.g.round(panel, 28, theme::PANEL);
             f.g.text("Two-factor code", 460, 290, size::TITLE, true, theme::TEXT);
             f.g.text(
@@ -2060,13 +2092,29 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
             ) {
                 app.open_editor(FieldTarget::TwoFactor, value.clone(), false);
             }
-            let m = Modal::TwoFactor { wrong, value };
-            if f.button(id("tfa-ok"), r(460, 570, 480, 90), "Verify", true) {
+            if trust_offered
+                && f.toggle(
+                    id("tfa-trust"),
+                    r(460, 560, 1000, 90),
+                    "Trust this TV (no code next time)",
+                    trust,
+                )
+            {
+                trust = !trust;
+            }
+            let by = if trust_offered { 670 } else { 570 };
+            let m = Modal::TwoFactor {
+                wrong,
+                value,
+                trust,
+                trust_offered,
+            };
+            if f.button(id("tfa-ok"), r(460, by, 480, 90), "Verify", true) {
                 app.modal = Some(m);
                 app.submit_2fa();
                 return;
             }
-            if f.button(id("tfa-cancel"), r(980, 570, 480, 90), "Cancel", false) {
+            if f.button(id("tfa-cancel"), r(980, by, 480, 90), "Cancel", false) {
                 app.end_session(false, "cancelled at 2fa");
                 keep = false;
             }
@@ -2216,6 +2264,73 @@ pub fn draw_modal(app: &mut App, f: &mut Frame) {
                 keep = false;
             }
             Modal::ReconnectPrompt
+        }
+        Modal::Update => {
+            use crate::updates::Install;
+            let latest = app.updates.available().unwrap_or("").to_owned();
+            let panel = r(460, 260, 1000, 520);
+            f.g.round(panel, 28, theme::PANEL);
+            f.g.text(
+                &format!("Update to {latest}"),
+                510,
+                300,
+                size::TITLE,
+                true,
+                theme::TEXT,
+            );
+            let st = app.updates.install_state();
+            let text = match &st {
+                Install::Idle => format!(
+                    "You have {}. Homebrew Channel downloads the new version, checks it and installs it. RustCouch closes while it installs; open it again afterwards.",
+                    crate::updates::current_version()
+                ),
+                Install::Downloading(Some(p)) => format!("Downloading… {p}%"),
+                Install::Downloading(None) => "Downloading…".into(),
+                Install::Installing => "Installing… RustCouch closes when it is done.".into(),
+                Install::Installed => "Installed. Open RustCouch again to use the new version.".into(),
+                Install::Failed(e) => format!("The update did not install: {e}."),
+            };
+            f.g.paragraph(&text, 510, 380, 900, size::BODY, theme::TEXT_DIM);
+            let busy = matches!(st, Install::Downloading(_) | Install::Installing);
+            let mut close = false;
+            match st {
+                Install::Idle | Install::Failed(_) => {
+                    let label = if matches!(st, Install::Failed(_)) {
+                        "Try again"
+                    } else {
+                        "Install now"
+                    };
+                    if f.button(id("upd-install"), r(510, 660, 440, 90), label, true) {
+                        app.updates.install();
+                    }
+                    if f.button(id("upd-later"), r(970, 660, 440, 90), "Later", false) {
+                        close = true;
+                    }
+                    if matches!(st, Install::Failed(_))
+                        && f.button(
+                            id("upd-hb"),
+                            r(510, 560, 900, 80),
+                            "Open Homebrew Channel instead",
+                            false,
+                        )
+                    {
+                        if let Err(e) = crate::updates::open_hbchannel(false) {
+                            app.toast(e);
+                        }
+                    }
+                }
+                _ if !busy => {
+                    if f.button(id("upd-later"), r(510, 660, 900, 90), "Close", false) {
+                        close = true;
+                    }
+                }
+                _ => {}
+            }
+            if close {
+                app.modal = None;
+                return;
+            }
+            Modal::Update
         }
         Modal::ServerPicker => {
             // Each profile keeps its own sign-in, so switching needs no new sign-in.

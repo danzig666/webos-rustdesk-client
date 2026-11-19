@@ -101,7 +101,13 @@ impl ServerProfile {
                 }
                 let s = hbb_common::socket_client::increase_port(s0, -2);
                 if s == s0 {
-                    format!("http://{}:{}", s, RENDEZVOUS_PORT - 2)
+                    // Upstream #16624: a bare IPv6 address needs brackets before the port.
+                    let host = if s.parse::<std::net::Ipv6Addr>().is_ok() {
+                        format!("[{s}]")
+                    } else {
+                        s
+                    };
+                    format!("http://{}:{}", host, RENDEZVOUS_PORT - 2)
                 } else {
                     format!("http://{s}")
                 }
@@ -135,8 +141,13 @@ impl ServerProfile {
         if s0.is_empty() {
             return vec![];
         }
-        // Host without a port (IPv6 literals keep their brackets).
+        // Host without a port (IPv6 literals keep their brackets; bare ones get them).
+        let bracketed;
         let host = match s0.rsplit_once(':') {
+            _ if s0.parse::<std::net::Ipv6Addr>().is_ok() => {
+                bracketed = format!("[{s0}]");
+                bracketed.as_str()
+            }
             Some((h, p)) if !h.is_empty() && p.chars().all(|c| c.is_ascii_digit()) && !h.ends_with(':') => h,
             _ => s0,
         };

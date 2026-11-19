@@ -1,6 +1,5 @@
 ### Changes
 
-* Online status is asked of the right server: `ID@public` computers from the public server, and on your own server plain IDs from both.
-* Favourites of the public server are listed on your own server too (connecting through the public server, with their saved passwords).
-* Entries through another server show "via public server".
-* An ID that is unknown or offline on your own server is tried on the public server automatically.
+* In-app updates: "Update to …" installs the new version through the Homebrew Channel (download, SHA-256 check, install), like ytnative; also Settings → Check for updates now.
+* 2FA: "Trust this TV" so the computer skips the code next time (RustDesk trusted devices).
+* From RustDesk upstream: libsodium is initialised at start (#16974); bare IPv6 ID servers get brackets in the derived API address (#16624).
